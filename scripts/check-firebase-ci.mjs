@@ -89,7 +89,6 @@ function checkVerifyWorkflow() {
     'permissions:',
     'contents: read',
     'ubuntu-latest',
-    'windows-latest',
     'npm ci',
     'npm audit --audit-level=high',
     'npm run verify',
