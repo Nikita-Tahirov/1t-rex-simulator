@@ -72,7 +72,7 @@
     "three": "^0.182.0",
     "troika-three-text": "^0.52.4",
     "uplot": "^1.6.32",
-    "valtio": "^2.3.1",
+    "valtio": "^2.3.2",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
