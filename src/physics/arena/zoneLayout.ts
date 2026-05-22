@@ -1,0 +1,10 @@
+import { ARENA } from '../constants.ts';
+
+export const QUADRANT_CENTER_OFFSET = ARENA.size / 4;
+
+export const ZONE_CENTERS = {
+  A: { x: -QUADRANT_CENTER_OFFSET, z: -QUADRANT_CENTER_OFFSET },
+  B: { x: QUADRANT_CENTER_OFFSET, z: -QUADRANT_CENTER_OFFSET },
+  C: { x: -QUADRANT_CENTER_OFFSET, z: QUADRANT_CENTER_OFFSET },
+  D: { x: QUADRANT_CENTER_OFFSET, z: QUADRANT_CENTER_OFFSET },
+} as const;

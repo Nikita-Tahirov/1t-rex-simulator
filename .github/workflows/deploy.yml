@@ -1,0 +1,102 @@
+name: deploy
+
+# Триггеры деплоя на Firebase Hosting:
+#   - push в main → автоматический production-деплой (включено 2026-05-22
+#     перед защитой ВКР, чтобы live-ссылка `rex-1t.web.app` всегда отражала
+#     последний коммит main).
+#   - workflow_dispatch → ручной запуск preview ∨ production.
+#   - tag `release/*` → production-деплой по тегу-метке релиза.
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'release/*'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Канал деплоя: production либо preview'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+
+concurrency:
+  group: deploy-${{ github.event.inputs.channel || 'production' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.15.0
+          cache: npm
+      - id: sha
+        run: echo "sha=${GITHUB_SHA::8}" >> "$GITHUB_OUTPUT"
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run build
+      - run: node scripts/check-performance-budget.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ steps.sha.outputs.sha }}
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
+
+  deploy-preview:
+    name: deploy preview
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.channel == 'preview'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: firebase-preview
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist-${{ needs.build.outputs.sha }}
+          path: dist/
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          channelId: preview-${{ needs.build.outputs.sha }}
+          expires: 7d
+
+  deploy-production:
+    name: deploy production
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.channel == 'production') ||
+      startsWith(github.ref, 'refs/tags/release/')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: firebase-production
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: dist-${{ needs.build.outputs.sha }}
+          path: dist/
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          channelId: live

@@ -1,0 +1,68 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and build artefacts
+node_modules
+dist
+dist-ssr
+coverage
+.vite
+*.tsbuildinfo
+
+# Local env files
+*.local
+.env
+.env.*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS / cloud sync
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN
+
+# Firebase
+.firebase
+.firebaserc
+firebase-debug.log
+firebase-debug.*.log
+
+# Asset pipeline intermediates
+public/models/.tmp
+public/models/*.stl
+
+# Video pipeline intermediates (only finished docs/video/scenarios.mp4 is committed)
+docs/video/_recording
+
+# Test artefacts
+test-results
+playwright-report
+
+# Local agent runs and scratch
+.codex-run
+.claude-run
+tmp
+
+# Local-only developer automation (kept on dev machine, not published).
+# These files are intentionally excluded from the public repository.
+.agents/
+CLAUDE.md
+docs/agent-onboarding.md
