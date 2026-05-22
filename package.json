@@ -73,7 +73,7 @@
     "troika-three-text": "^0.52.4",
     "uplot": "^1.6.32",
     "valtio": "^2.3.1",
-    "zustand": "^5.0.12"
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.2",
