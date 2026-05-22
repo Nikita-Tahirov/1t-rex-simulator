@@ -33,15 +33,22 @@ const PARALLELISM = Math.max(1, Number(process.env.SIM_EXPORT_PARALLEL ?? 1));
  */
 const EXPORT_RETRIES = Math.max(0, Number(process.env.SIM_EXPORT_RETRIES ?? 3));
 
+// Бюджет на завершение сценария в Chromium-окне. Это таймаут CI, не физический
+// лимит верификатора: verifier остаётся строгим (`verification.passed=true`
+// требует прежнего score). На локальной машине (i7-11800H + RTX 3080) сценарии
+// укладываются с запасом; на GitHub Actions runner (2 vCPU shared, без GPU)
+// Rapier WASM SIMD идёт ×2-3 медленнее — поэтому obstacleAvoidance и spinnerImpact
+// получают расширенный бюджет, чтобы не падать по runtime timeout до того, как
+// physics-цикл реально доедет до финиша.
 const runs = [
-  { id: 'obstacleAvoidance', timeoutMs: 60_000 },
-  { id: 'searchAndStrike', timeoutMs: 90_000 },
-  { id: 'spinnerImpact', timeoutMs: 60_000 },
-  { id: 'fsmVsBt', mode: 'bt', timeoutMs: 90_000 },
-  { id: 'fsmVsBt', mode: 'fsm', timeoutMs: 150_000 },
-  { id: 'figureEight', timeoutMs: 150_000 },
-  { id: 'madgwickVsComplementary', timeoutMs: 90_000 },
-  { id: 'brownoutDischarge', timeoutMs: 90_000 },
+  { id: 'obstacleAvoidance', timeoutMs: 120_000 },
+  { id: 'searchAndStrike', timeoutMs: 120_000 },
+  { id: 'spinnerImpact', timeoutMs: 90_000 },
+  { id: 'fsmVsBt', mode: 'bt', timeoutMs: 120_000 },
+  { id: 'fsmVsBt', mode: 'fsm', timeoutMs: 180_000 },
+  { id: 'figureEight', timeoutMs: 180_000 },
+  { id: 'madgwickVsComplementary', timeoutMs: 120_000 },
+  { id: 'brownoutDischarge', timeoutMs: 120_000 },
 ];
 
 function labelOf(run) {
