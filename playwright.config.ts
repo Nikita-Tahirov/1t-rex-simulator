@@ -2,10 +2,15 @@ import { defineConfig, devices } from '@playwright/test';
 
 const e2ePort = Number(process.env.SIM_E2E_PORT ?? 5174);
 const e2eBaseURL = `http://127.0.0.1:${e2ePort}`;
+// Windows локально имеет аппаратный D3D11; ubuntu/macOS на CI работают без GPU,
+// поэтому Chromium принудительно идёт на SwiftShader (Mesa software OpenGL).
+// Без `--use-gl=swiftshader` headless Chromium на ubuntu-latest не создаёт
+// WebGL context, Three.js не монтирует сцену, и все e2e падают на ожидании
+// `window.__sceneRenderState?.meshCount > 20` (проверено 2026-05-22).
 const chromiumGpuArgs =
   process.platform === 'win32'
     ? ['--use-angle=d3d11', '--ignore-gpu-blocklist']
-    : ['--ignore-gpu-blocklist'];
+    : ['--use-gl=swiftshader', '--ignore-gpu-blocklist'];
 
 // Параллелизм: 4 worker по умолчанию (≈ четверть от 16-ядерной машины),
 // override через SIM_E2E_WORKERS. На CI достаточно 2, чтобы не выйти за лимит

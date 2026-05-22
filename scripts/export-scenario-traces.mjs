@@ -11,7 +11,14 @@ const outDir = process.env.SIM_EXPORT_OUT_DIR
 const exportPort = process.env.SIM_EXPORT_PORT ?? '5175';
 const baseURL = process.env.SIM_URL ?? `http://127.0.0.1:${exportPort}/`;
 const channel = process.env.PLAYWRIGHT_CHANNEL;
-const chromiumGpuArgs = ['--ignore-gpu-blocklist'];
+// На не-Windows (ubuntu CI без GPU) принудительно идём через SwiftShader, иначе
+// headless Chromium не создаёт WebGL context и сцена 1T-REX не монтируется.
+// На Windows локально оставляем default (аппаратный D3D11), потому что
+// `--use-gl=swiftshader` там заметно медленнее и не нужен.
+const chromiumGpuArgs =
+  process.platform === 'win32'
+    ? ['--ignore-gpu-blocklist']
+    : ['--use-gl=swiftshader', '--ignore-gpu-blocklist'];
 const BOOT_TIMEOUT_MS = 45_000;
 // Параллельный пул отключён по умолчанию (PARALLELISM=1, последовательный экспорт).
 // Причина: параллельные Chromium-контексты конкурируют за GPU/CPU, физический шаг
