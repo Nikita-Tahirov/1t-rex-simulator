@@ -1,0 +1,267 @@
+.sim-panel {
+  border: 1px solid var(--surface-panel-border);
+  border-radius: var(--surface-panel-radius);
+  background: var(--surface-panel-bg);
+  box-shadow: var(--surface-shadow-raised);
+  backdrop-filter: var(--blur-md);
+  -webkit-backdrop-filter: var(--blur-md);
+}
+
+.sim-title-gradient {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sim-card {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--surface-card-radius);
+  background: var(--surface-card-bg);
+  padding: 16px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025) inset;
+  transition:
+    transform var(--timing-fast) var(--ease-standard),
+    background var(--timing-fast) var(--ease-standard),
+    border-color var(--timing-fast) var(--ease-standard);
+}
+
+.sim-card:hover {
+  border-color: var(--surface-border-accent);
+  background: var(--surface-card-bg-hover);
+  transform: translateY(-1px);
+}
+
+.sim-card--pink {
+  border-color: rgba(var(--accent-primary-rgb), 0.32);
+}
+
+.sim-card--compact {
+  gap: 6px;
+  padding: 12px;
+}
+
+.sim-card__header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sim-card__title {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--accent-secondary-readable);
+  text-wrap: balance;
+}
+
+.sim-card__body {
+  min-width: 0;
+}
+
+.sim-card__toggle {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-pill);
+  background: rgba(var(--text-main-rgb), 0.045);
+  color: var(--text-secondary);
+  transition:
+    background var(--timing-fast) var(--ease-standard),
+    border-color var(--timing-fast) var(--ease-standard),
+    color var(--timing-fast) var(--ease-standard);
+}
+
+.sim-card__toggle:hover {
+  border-color: var(--surface-border-strong);
+  background: rgba(var(--text-main-rgb), 0.08);
+  color: var(--text-main);
+}
+
+.sim-card__chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform var(--timing-fast) var(--ease-standard);
+}
+
+.sim-card--collapsed .sim-card__chevron {
+  transform: translateX(-1px) rotate(-45deg);
+}
+
+.sim-control,
+.sim-tab {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-pill);
+  background: rgba(var(--text-main-rgb), 0.045);
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.1;
+  transition:
+    background var(--timing-fast) var(--ease-standard),
+    border-color var(--timing-fast) var(--ease-standard),
+    color var(--timing-fast) var(--ease-standard),
+    box-shadow var(--timing-fast) var(--ease-standard);
+}
+
+.sim-control:hover,
+.sim-tab:hover {
+  border-color: var(--surface-border-strong);
+  background: rgba(var(--text-main-rgb), 0.08);
+  color: var(--text-main);
+}
+
+.sim-control--active,
+.sim-tab--active {
+  border-color: rgba(var(--accent-secondary-rgb), 0.72);
+  background: rgba(var(--accent-secondary-rgb), 0.16);
+  color: var(--text-main);
+  box-shadow: 0 0 0 1px rgba(var(--accent-secondary-rgb), 0.12) inset;
+}
+
+.sim-control--primary {
+  border-color: rgba(var(--accent-primary-rgb), 0.42);
+  color: var(--accent-primary-readable);
+}
+
+.sim-control--primary.sim-control--active,
+.sim-control--primary:hover {
+  border-color: rgba(var(--accent-primary-rgb), 0.72);
+  background: rgba(var(--accent-primary-rgb), 0.16);
+  color: var(--text-main);
+}
+
+.sim-tablist {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-pill);
+  background: rgba(var(--text-main-rgb), 0.035);
+  padding: 4px;
+}
+
+.sim-select {
+  min-height: 40px;
+  width: 100%;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: rgba(5, 2, 10, 0.58);
+  padding: 8px 12px;
+  color: var(--text-main);
+  font-size: 0.82rem;
+}
+
+.sim-range {
+  height: 6px;
+  width: 100%;
+  cursor: pointer;
+  appearance: none;
+  border-radius: var(--radius-pill);
+  background: rgba(var(--text-main-rgb), 0.14);
+  accent-color: var(--accent-secondary-readable);
+}
+
+.sim-floating-readout {
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  background: rgba(18, 10, 32, 0.72);
+  box-shadow: var(--surface-shadow);
+  backdrop-filter: var(--blur-sm);
+  -webkit-backdrop-filter: var(--blur-sm);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .sim-panel {
+    border-radius: 20px;
+  }
+
+  .sim-control,
+  .sim-tab {
+    min-height: var(--touch-min);
+    font-size: 0.78rem;
+  }
+
+  .sim-select {
+    min-height: var(--touch-min);
+  }
+
+  .sim-card {
+    padding: 14px;
+  }
+
+  .sim-card__toggle {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms;
+    animation-iteration-count: 1;
+    scroll-behavior: auto;
+    transition-duration: 0.001ms;
+  }
+
+  .sim-card,
+  .sim-control,
+  .sim-card__chevron,
+  .sim-card__toggle,
+  .sim-tab {
+    transition-duration: 0.001ms;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --surface-panel-bg: rgba(18, 12, 32, 0.96);
+    --surface-card-bg: rgba(26, 16, 44, 0.98);
+    --surface-card-bg-hover: rgba(34, 22, 56, 0.99);
+    --surface-raised-bg: rgba(22, 14, 38, 0.99);
+  }
+}
+
+@media (forced-colors: active) {
+  .sim-panel,
+  .sim-card,
+  .sim-card__toggle,
+  .sim-control,
+  .sim-tab,
+  .sim-select {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+  }
+}

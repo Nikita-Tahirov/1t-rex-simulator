@@ -1,0 +1,22 @@
+{
+  "name": "1T-REX Sim — симулятор боевого робота",
+  "short_name": "1T-REX Sim",
+  "description": "Веб-симулятор боевого робота 1T-REX. ВКР по программированию интеллектуальных роботов, Финуниверситет, 2026.",
+  "id": "/",
+  "scope": "/",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "theme_color": "#08090b",
+  "background_color": "#08090b",
+  "lang": "ru-RU",
+  "categories": ["education", "simulation", "robotics"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

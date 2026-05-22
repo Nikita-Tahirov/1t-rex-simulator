@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://1t-rex.local/.agents/manifest.schema.json",
+  "title": "1T-REX Agent Manifest",
+  "description": "Самопроверяемый реестр агентской инфраструктуры 1T-REX Simulator. Описывает компоненты, доступные любому repo-агенту (Claude Code, Codex CLI, Cursor, и др.), и заявляет основной документ-манифест, играющий роль AGENTS.md/CLAUDE.md.",
+  "type": "object",
+  "required": ["version", "name", "primarySource", "commands", "subagents", "skills"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Относительный путь к этому файлу схемы."
+    },
+    "version": {
+      "type": "integer",
+      "const": 2,
+      "description": "Версия формата манифеста. Обновлять при breaking-change полей."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Уникальное имя манифеста."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "primarySource": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Имя главного документа-манифеста в корне репозитория (single source of truth для агента). В этом проекте — CLAUDE.md, играющий роль AGENTS.md."
+    },
+    "alsoKnownAs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Альтернативные имена, под которыми primarySource известен другим инструментам (например, AGENTS.md)."
+    },
+    "compatibleTools": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Идентификаторы AI-инструментов, способных читать этот манифест и сопутствующие файлы."
+    },
+    "lastUpdated": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Дата последнего обновления манифеста в формате YYYY-MM-DD."
+    },
+    "commands": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/component" },
+      "description": "Slash-команды (.agents/commands/<name>.md), которыми агент может управлять явно."
+    },
+    "subagents": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/component" },
+      "description": "Специализированные саб-агенты с собственным контекстом и инструментарием."
+    },
+    "skills": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/component" },
+      "description": "Skill-папки (.agents/skills/<name>/SKILL.md) с progressive disclosure для конкретного workflow."
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "required": ["name", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Уникальное kebab-case имя компонента."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^\\.agents/.+\\.md$",
+          "description": "Относительный путь к markdown-файлу компонента."
+        }
+      }
+    }
+  }
+}

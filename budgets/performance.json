@@ -1,0 +1,16 @@
+{
+  "bundle": {
+    "maxTotalJsGzipKb": 2100,
+    "maxEntryJsGzipKb": 80,
+    "maxCssGzipKb": 24,
+    "maxRawChunkKb": 5000
+  },
+  "assets": {
+    "maxModelTotalKb": 650
+  },
+  "runtime": {
+    "minMeasuredFps": 58,
+    "minSoftwareRendererFps": 4,
+    "maxVerificationMsFor50kEntries": 700
+  }
+}

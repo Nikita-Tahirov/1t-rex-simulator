@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+@source "../index.html";
+@source "../src/**/*.{ts,tsx}";
+
+@theme {
+  --color-bg: #05020a;
+  --color-bg-elevated: #10091d;
+  --color-panel: rgba(18, 10, 32, 0.76);
+  --color-panel-border: rgba(255, 255, 255, 0.08);
+  --color-accent: #4cbcff;
+  --color-accent-pink: #ff4fc3;
+  --color-accent-cyan: #4cbcff;
+  --color-accent-purple: #8a6cff;
+  --color-text: #ffffff;
+  --color-text-dim: #c0bdd0;
+  --color-text-muted: #8a8694;
+  --color-warn: #f39c12;
+  --color-danger: #e74c3c;
+  --color-ok: #2ecc71;
+  --font-display: "Segoe UI", system-ui, sans-serif;
+  --font-body: "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Consolas", monospace;
+}
+
+:root {
+  --bg-color: #05020a;
+  --text-main: #ffffff;
+  --text-secondary: #c0bdd0;
+  --text-muted: #8a8694;
+  --accent-primary: #d50085;
+  --accent-primary-readable: #ff4fc3;
+  --accent-secondary: #0099ff;
+  --accent-secondary-readable: #4cbcff;
+  --accent-gradient: linear-gradient(135deg, #d50085, #0099ff);
+  --accent-gradient-soft: linear-gradient(135deg, rgba(213, 0, 133, 0.16), rgba(0, 153, 255, 0.16));
+  --text-main-rgb: 255, 255, 255;
+  --text-secondary-rgb: 192, 189, 208;
+  --accent-primary-rgb: 213, 0, 133;
+  --accent-secondary-rgb: 0, 153, 255;
+  --surface-panel-bg: linear-gradient(155deg, rgba(22, 14, 42, 0.78), rgba(10, 5, 22, 0.86));
+  --surface-card-bg: linear-gradient(145deg, rgba(34, 22, 58, 0.58), rgba(14, 7, 28, 0.72));
+  --surface-card-bg-hover: linear-gradient(145deg, rgba(46, 30, 74, 0.72), rgba(18, 9, 36, 0.82));
+  --surface-raised-bg: linear-gradient(145deg, rgba(40, 26, 68, 0.96), rgba(14, 7, 28, 0.98));
+  --surface-panel-border: rgba(255, 255, 255, 0.06);
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --surface-border-strong: rgba(255, 255, 255, 0.14);
+  --surface-border-accent: rgba(0, 153, 255, 0.45);
+  --surface-panel-radius: 24px;
+  --surface-card-radius: 14px;
+  --surface-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 16px 40px -20px rgba(0, 0, 0, 0.7);
+  --surface-shadow-raised: 0 20px 56px -24px rgba(0, 0, 0, 0.85), 0 2px 12px rgba(0, 0, 0, 0.32);
+  --surface-shadow-hover: 0 12px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 153, 255, 0.36);
+  --surface-glow-focus: 0 0 0 3px rgba(0, 153, 255, 0.22);
+  --blur-sm: blur(8px);
+  --blur-md: blur(20px);
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+  --touch-min: 44px;
+  --timing-fast: 0.18s;
+  --timing-normal: 0.24s;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100dvh;
+  overflow: hidden;
+  color: var(--text-main);
+  background:
+    linear-gradient(125deg, rgba(213, 0, 133, 0.18), transparent 28%),
+    linear-gradient(315deg, rgba(0, 153, 255, 0.16), transparent 34%),
+    var(--bg-color);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  padding-top: env(safe-area-inset-top, 0);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+[role="button"],
+select,
+input[type="range"] {
+  touch-action: manipulation;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: rgba(var(--accent-primary-rgb), 0.5);
+  color: var(--text-main);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-secondary-readable);
+  outline-offset: 2px;
+  box-shadow: var(--surface-glow-focus);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  background-clip: content-box;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}

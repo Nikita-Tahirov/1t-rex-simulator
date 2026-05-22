@@ -1,0 +1,41 @@
+{
+  "$schema": "./manifest.schema.json",
+  "version": 2,
+  "name": "1trex-simulator-agents",
+  "description": "Manifest агентской инфраструктуры 1T-REX Simulator: единый реестр subagents, slash-команд и skill-файлов, доступных Claude Code, Codex CLI, Cursor, Aider и любым другим repo-агентам.",
+  "primarySource": "CLAUDE.md",
+  "alsoKnownAs": ["AGENTS.md"],
+  "compatibleTools": [
+    "claude-code",
+    "codex-cli",
+    "cursor",
+    "aider",
+    "copilot",
+    "gemini-cli",
+    "windsurf",
+    "amazon-q"
+  ],
+  "lastUpdated": "2026-05-15",
+  "commands": [
+    { "name": "first-touch", "path": ".agents/commands/first-touch.md" },
+    { "name": "perf-budget", "path": ".agents/commands/perf-budget.md" },
+    { "name": "scenario-audit", "path": ".agents/commands/scenario-audit.md" },
+    { "name": "verify", "path": ".agents/commands/verify.md" }
+  ],
+  "subagents": [
+    {
+      "name": "accessibility-i18n-reviewer",
+      "path": ".agents/subagents/accessibility-i18n-reviewer.md"
+    },
+    { "name": "architecture-reviewer", "path": ".agents/subagents/architecture-reviewer.md" },
+    { "name": "performance-verifier", "path": ".agents/subagents/performance-verifier.md" },
+    { "name": "scenario-verifier", "path": ".agents/subagents/scenario-verifier.md" }
+  ],
+  "skills": [
+    {
+      "name": "robot-scenario-verification",
+      "path": ".agents/skills/robot-scenario-verification/SKILL.md"
+    },
+    { "name": "web-sim-performance", "path": ".agents/skills/web-sim-performance/SKILL.md" }
+  ]
+}

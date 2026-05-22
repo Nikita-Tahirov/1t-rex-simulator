@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      app-runtime:
+        patterns:
+          - react
+          - react-dom
+          - three
+          - '@react-three/*'
+          - '@dimforge/*'
+      quality-gates:
+        patterns:
+          - '@playwright/*'
+          - vitest
+          - typescript
+          - eslint
+          - '@biomejs/*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
