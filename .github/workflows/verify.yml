@@ -13,15 +13,16 @@ jobs:
     name: verify / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    # ubuntu — обязательная подпись «зелёного» статуса для бейджа README.
-    # windows запускается информационно: на shared GitHub Actions runner он
-    # систематически в ~1.4-1.6 раза медленнее ubuntu и иногда упирается в
-    # timeout (особенно playwright фаза). Не блокирует overall conclusion.
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    # CI matrix только ubuntu: Firebase Hosting target тоже ubuntu, поэтому
+    # production-like подпись адекватна. Windows локально проверяется автором
+    # на дев-машине (полный verify gate без env-флагов). На shared GitHub
+    # Actions windows runner полный verify систематически > 45 мин (×1.4-1.6
+    # к ubuntu) и cancelled по timeout даёт overall=cancelled, который
+    # `continue-on-error` не ловит (только failure). Проверено 2026-05-22.
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
