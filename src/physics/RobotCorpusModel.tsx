@@ -5,7 +5,7 @@ import { ROBOT } from './constants.ts';
 
 /**
  * Корпус 1T-REX — отдельная GLB-модель из CAD команды.
- * Источник: `робот/glb-source/RobotYbiyca_Corpus.glb` → optimize+draco → `public/models/1trex-corpus.glb`.
+ * Источник: `robot/glb-source/RobotYbiyca_Corpus.glb` → optimize+draco → `public/models/1trex-corpus.glb`.
  * Модель в МЕТРАХ (Blender exporter), без текстур, plain PBR-материал.
  *
  * Самоориентация модели в исходнике (Blender):

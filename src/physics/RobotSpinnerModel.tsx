@@ -4,7 +4,7 @@ import { type Mesh, MeshStandardMaterial, type Object3D } from 'three';
 
 /**
  * Модель вертикального ротора 1T-REX (диск с зубьями).
- * Источник: `робот/glb-source/RobotYbiyca_Spinner.glb` → optimize+draco →
+ * Источник: `robot/glb-source/RobotYbiyca_Spinner.glb` → optimize+draco →
  * `public/models/1trex-spinner.glb` (~140 КБ).
  *
  * Локальная ось диска в исходнике — X (узкая координата). В физике ось

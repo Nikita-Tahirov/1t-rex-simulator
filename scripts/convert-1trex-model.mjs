@@ -1,6 +1,6 @@
 // Конвейер сжатия 3D-моделей 1T-REX для веб-симулятора.
 //
-// Источник: `робот/glb-source/RobotYbiyca_*.glb` — несжатые GLB,
+// Источник: `robot/glb-source/RobotYbiyca_*.glb` — несжатые GLB,
 // экспортированные Blender (Khronos glTF I/O) из CAD-сборки команды 1Т.
 // Выход:    `public/models/1trex-{corpus,spinner,wheel}.glb`
 // Pipeline: gltf-transform optimize (weld → simplify → prune → draco).
@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, '..');
-const SRC_DIR = resolve(PROJECT_ROOT, 'робот', 'glb-source');
+const SRC_DIR = resolve(PROJECT_ROOT, 'robot', 'glb-source');
 const OUT_DIR = resolve(PROJECT_ROOT, 'public', 'models');
 const npmCli = process.env.npm_execpath;
 const npmNode = process.env.npm_node_execpath ?? process.execPath;

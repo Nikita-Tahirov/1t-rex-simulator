@@ -5,7 +5,7 @@ import { type Mesh, MeshStandardMaterial, type Object3D } from 'three';
 
 /**
  * Модель одного колеса 1T-REX.
- * Источник: `робот/glb-source/RobotYbiyca_Wheel.glb` → optimize+draco →
+ * Источник: `robot/glb-source/RobotYbiyca_Wheel.glb` → optimize+draco →
  * `public/models/1trex-wheel.glb` (~14 КБ после draco).
  *
  * Модель уже в метрах. Локальная ось вращения колеса в исходнике — X
