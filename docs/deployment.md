@@ -23,7 +23,7 @@
 
 | Параметр | Значение |
 |:---------|:---------|
-| Дата | `2026-05-15` |
+| Дата | обновляется автоматически при каждом push в `main` (auto-deploy с 2026-05-22) |
 | Канал | `live` |
 | Hosting URL | <https://rex-1t.web.app> |
 | Release user | `nikita.tahirov@gmail.com` |
@@ -41,7 +41,8 @@
 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | HTTPS-only для custom domains |
 | `Permissions-Policy` | camera/geolocation/microphone/payment/etc. off | браузерные capabilities не нужны симулятору |
 | `Content-Type` (`*.wasm`) | `application/wasm` | браузер исполняет WASM напрямую |
-| `Cache-Control` (статика) | `public, max-age=31536000, immutable` | хеши файлов → вечный кэш |
+| `Cache-Control` (`/models`, `/draco`, favicon/icons.svg) | `public, max-age=31536000, immutable` | стабильные хешированные ассеты → вечный кэш |
+| `Cache-Control` (`/assets`, `/fonts`) | `no-cache` | SPA-fallback: старый HTML не должен закэшировать уже отсутствующий bundle |
 | `Cache-Control` (`index.html`) | `no-cache` | всегда свежий manifest chunks |
 
 `.firebaserc` содержит alias `default → rex-1t`. Файл в `.gitignore` — ∀ разработчиков свой.
@@ -53,8 +54,8 @@ SPA rewrite, manifest, Dependabot и оба GitHub Actions workflow.
 
 | Workflow | Триггер | Что делает |
 |:--|:--|:--|
-| `.github/workflows/verify.yml` | PR и push в `main/master` | `npm audit --audit-level=high` + полный `npm run verify` на Ubuntu и Windows |
-| `.github/workflows/deploy.yml` | `workflow_dispatch` или тег `release/*` | build + budgets + Firebase Hosting deploy |
+| `.github/workflows/verify.yml` | PR и push в `main/master` | `npm audit --audit-level=high` + полный `npm run verify` на Ubuntu (matrix сокращён до ubuntu-only 2026-05-22; Windows проверяется автором локально — на shared runner verify > 45 мин → timeout) |
+| `.github/workflows/deploy.yml` | push в `main` (auto-production), `workflow_dispatch` (preview/production) или тег `release/*` | build + budgets + Firebase Hosting deploy |
 | `.github/dependabot.yml` | еженедельно | PR для npm и GitHub Actions обновлений |
 
 Оба workflow держат `permissions: contents: read`. Деплойные секреты живут

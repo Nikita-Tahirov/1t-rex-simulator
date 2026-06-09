@@ -1,3 +1,17 @@
+/**
+ * @packageDocumentation
+ * Независимый детерминированный верификатор сценарных JSON-протоколов 1T-REX.
+ *
+ * Точка входа V&V-контура: принимает {@link ScenarioVerificationPayload}
+ * (телеметрия + события + метаданные лога) и возвращает
+ * {@link ScenarioVerificationResult} с embedded `passed` — доказательным
+ * признаком прохождения сценария. UI summary доказательством не считается.
+ *
+ * Должен оставаться в паритете с браузерным экспортом и Node-верификатором
+ * (`scripts/verify-scenario-log.mjs`): одна и та же причинная цепь
+ * command → motion → scenario progress → goal на любой платформе.
+ */
+
 import {
   commonChecks,
   pushCheck,
@@ -14,6 +28,15 @@ import type { ScenarioVerificationPayload, ScenarioVerificationResult } from './
 
 export type { ScenarioVerificationPayload };
 
+/**
+ * Проверяет причинную цепь сценарного лога: command → motion → scenario
+ * progress → goal. Нечисловые записи позиции отбрасываются до расчёта
+ * статистики траектории; диспетчеризация по `payload.scenarioId` добавляет
+ * сценарно-специфичные проверки поверх общих (`commonChecks`).
+ *
+ * @returns результат с `passed` (все проверки прошли), `score` (доля
+ * прошедших проверок) и наблюдаемой статистикой траектории `observed`.
+ */
 export function verifyScenarioLog(
   payload: ScenarioVerificationPayload,
 ): ScenarioVerificationResult {

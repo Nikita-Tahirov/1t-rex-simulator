@@ -63,6 +63,6 @@ tmp
 
 # Local-only developer automation (kept on dev machine, not published).
 # These files are intentionally excluded from the public repository.
-.agents/
+.claude/
 CLAUDE.md
 docs/agent-onboarding.md

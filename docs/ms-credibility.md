@@ -22,11 +22,11 @@
 | Requirements | Требования и границы применимости зафиксированы в этом документе, [architecture.md](./architecture.md), [assumptions.md](./assumptions.md) | закрыто для ВКР-уровня |
 | Conceptual model | Слои панели индикации / автономности / управления / сенсоров / физики описаны в [architecture.md](./architecture.md) | закрыто |
 | Mathematical model | PID, мотор, АКБ, skid-steer, IMU, фильтры и FSM описаны в [models.md](./models.md) | закрыто |
-| Code verification | `npm run ci`: Biome, TypeScript strict, Vitest unit-тесты | закрыто |
+| Code verification | `npm run ci` (= полный `npm run verify`): Biome ci, ESLint, agent infra, TypeScript strict, Vitest, line/source/firebase, build, budgets, scenario export, Playwright | закрыто |
 | Numerical reproducibility | Сценарии получают фиксированный `seed`; `searchAndStrike` больше не использует `Date.now()` | закрыто для сценариев |
 | Results traceability | JSON-лог содержит `schemaVersion`, `appVersion`, `modelVersion`, `scenarioId`, `seed`, телеметрию и метрики | закрыто |
 | Validation against real data | Нет калибровочных прогонов физического 1T-REX | открыто |
-| Uncertainty quantification | Протокол 10 seed-прогонов описан в [experiments.md](./experiments.md), но численные серии ещё не сняты | открыто |
+| Uncertainty quantification | Протокол повторных seed-прогонов для UQ ещё не зафиксирован (в [experiments.md](./experiments.md) один seed по умолчанию `20260428`); численные seed-серии не сняты — см. долг валидации п. 4 | открыто |
 | Независимая экспертиза | Не выполнялась внешняя экспертиза модели | открыто |
 
 ## 3. Критерии приёмки

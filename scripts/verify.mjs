@@ -47,7 +47,7 @@ const PHASES = [
     // Browser-шаги серийны: параллельный запуск двух Vite-серверов на OneDrive
     // даёт Vite-startup timeout (проверено 2026-05-15, FS-bound).
     //
-    // На shared CI runner (GitHub Actions ubuntu/windows-latest, без аппаратного
+    // На shared CI runner (GitHub Actions ubuntu-latest, без аппаратного
     // GPU) Rapier WASM физика идёт медленнее, чем `runs[i].timeoutMs` (Chromium
     // headless + SwiftShader). Главная доказательность ВКР — уже-сгенерированные
     // JSON-протоколы в docs/experiments/ — проверяется CPU-only шагом

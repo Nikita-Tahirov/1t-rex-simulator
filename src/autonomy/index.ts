@@ -7,7 +7,7 @@
  *   повторяющий структуру прошивки для МК МИК32 «Амур». Имена и сигнатуры
  *   переходов зафиксированы как требование совместимости.
  * - `RobotBTAgent` + `makeBehaviorTree` — дерево поведения через DSL Mistreevous:
- *   `selector { Emergency → Engage → Avoid → Patrol }`.
+ *   `selector { EmergencyStop → Engage → Avoid → Patrol }`.
  *
  * Оба модуля — чистый TypeScript без зависимостей от DOM, React и Rapier.
  *

@@ -2,9 +2,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const manifestPath = path.join(root, '.agents', 'manifest.json');
+const manifestPath = path.join(root, '.claude', 'manifest.json');
 
-// Local-only automation: when .agents/manifest.json is absent (e.g. on public CI
+// Local-only automation: when .claude/manifest.json is absent (e.g. on public CI
 // where developer-tooling files are git-ignored), skip with a neutral note instead
 // of failing — full validation still runs on machines that have the manifest.
 if (!existsSync(manifestPath)) {
@@ -35,8 +35,8 @@ if (manifest.lastUpdated && !ISO_DATE.test(manifest.lastUpdated)) {
   errors.push('manifest.lastUpdated must be YYYY-MM-DD');
 }
 
-const schemaPath = path.join(root, '.agents', 'manifest.schema.json');
-if (!existsSync(schemaPath)) errors.push('.agents/manifest.schema.json is missing');
+const schemaPath = path.join(root, '.claude', 'manifest.schema.json');
+if (!existsSync(schemaPath)) errors.push('.claude/manifest.schema.json is missing');
 
 const primarySource = manifest.primarySource ?? 'CLAUDE.md';
 const primarySourcePath = path.join(root, primarySource);
@@ -71,8 +71,8 @@ function validateItem(section, item) {
   if (!COMPONENT_NAME.test(item.name)) {
     errors.push(`${section}.${item.name}: name must be kebab-case`);
   }
-  if (!item.path.startsWith('.agents/') || !item.path.endsWith('.md')) {
-    errors.push(`${section}.${item.name}: path must start with .agents/ and end with .md`);
+  if (!item.path.startsWith('.claude/') || !item.path.endsWith('.md')) {
+    errors.push(`${section}.${item.name}: path must start with .claude/ and end with .md`);
   }
   const file = path.join(root, item.path);
   if (!existsSync(file)) {

@@ -146,13 +146,15 @@ src/
 ├── store/        Низкочастотное состояние (Zustand) + телеметрия (Valtio)
 ├── hud/          Панель индикации: полётная, сенсорная, инженерная вкладки
 ├── monitoring/   ErrorBoundary, performance hooks
+├── lib/          Общие утилиты: clamp (math.ts), createRafSampler
+├── offline/      Регистрация service worker, offline fallback
 └── theme/        Дизайн-токены и цветовая палитра
 
 docs/             Документация ВКР: архитектура, модели, допущения, эксперименты, V&V
 e2e/              Playwright + axe: drive, collision, experiments, HUD, performance
 scripts/          Шлюзы verify, экспорт сценариев, видео, сборка GLB
 public/           GLB-модели робота, Draco-декодер, иконки PWA
-робот/glb-source/ Исходные несжатые GLB корпуса, ротора, колеса
+robot/glb-source/ Исходные несжатые GLB корпуса, ротора, колеса
 ```
 
 ---

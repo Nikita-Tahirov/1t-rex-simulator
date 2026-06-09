@@ -50,7 +50,7 @@ const PHASES = [
     // конкурирует за file watcher и приводит к Vite-startup timeout. Проверено
     // 2026-05-15: попытка параллели падает с FS-bound таймаутом.
     //
-    // На shared CI runner (GitHub Actions ubuntu/windows-latest, без аппаратного
+    // На shared CI runner (GitHub Actions ubuntu-latest, без аппаратного
     // GPU) Rapier WASM физика идёт медленнее, чем `runs[i].timeoutMs` (Chromium
     // headless + SwiftShader). Главная доказательность ВКР — уже-сгенерированные
     // JSON-протоколы в docs/experiments/ — проверяется CPU-only шагом

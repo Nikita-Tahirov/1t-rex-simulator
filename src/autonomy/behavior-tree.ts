@@ -9,9 +9,9 @@ import { clamp } from '@/lib/math.ts';
  *
  * Дерево описано в MDSL (Mistreevous DSL) — компактном текстовом формате:
  *   root — Selector ("ИЛИ"): пробует ветви по порядку
- *   ├─ EmergencyRecover    (если перевёрнут / низкий АКБ / перегрев / нет связи)
- *   ├─ EngageTarget        (если цель в зоне атаки)
- *   ├─ AvoidObstacle       (если препятствие близко)
+ *   ├─ EmergencyStop       (cond IsEmergency: перевёрнут / низкий АКБ / перегрев / нет связи)
+ *   ├─ Engage              (cond HasTarget + TargetInRange)
+ *   ├─ Avoid               (cond HasObstacle)
  *   └─ Patrol              (по умолчанию — поиск)
  *
  * Каждое действие возвращает Succeeded / Failed / Running.
