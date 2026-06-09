@@ -34,12 +34,17 @@ interface Props {
 export function RobotCorpusModel({ bodyColor = '#5a3fd8' }: Props) {
   const { scene } = useGLTF('/models/1trex-corpus.glb');
 
+  // Клон на инстанс: `useGLTF` кэширует ОДНУ сцену по URL. Раньше материал
+  // присваивался прямо ей — при нескольких роботах разного цвета последний
+  // перекрашивал всех. Клон делит геометрию (дёшево), но имеет свой материал.
+  const instance = useMemo(() => scene.clone(true), [scene]);
+
   const { centerX, centerZ, minY } = useMemo(() => {
-    const box = new Box3().setFromObject(scene);
+    const box = new Box3().setFromObject(instance);
     const c = new Vector3();
     box.getCenter(c);
     return { centerX: c.x, centerZ: c.z, minY: box.min.y };
-  }, [scene]);
+  }, [instance]);
 
   useMemo(() => {
     const material = new MeshStandardMaterial({
@@ -47,7 +52,7 @@ export function RobotCorpusModel({ bodyColor = '#5a3fd8' }: Props) {
       metalness: 0.65,
       roughness: 0.4,
     });
-    scene.traverse((obj: Object3D) => {
+    instance.traverse((obj: Object3D) => {
       const mesh = obj as Mesh;
       if (mesh.isMesh) {
         mesh.castShadow = true;
@@ -55,11 +60,11 @@ export function RobotCorpusModel({ bodyColor = '#5a3fd8' }: Props) {
         mesh.material = material;
       }
     });
-  }, [scene, bodyColor]);
+  }, [instance, bodyColor]);
 
   return (
     <group rotation={[0, ROBOT.modelYawOffset, 0]}>
-      <primitive object={scene} position={[-centerX, -minY, -centerZ]} />
+      <primitive object={instance} position={[-centerX, -minY, -centerZ]} />
     </group>
   );
 }

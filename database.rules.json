@@ -1,0 +1,71 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "roomsIndex": {
+      ".read": "auth != null",
+      "$roomId": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['name','status','playerCount','maxPlayers','hostId'])",
+        "name": { ".validate": "newData.isString() && newData.val().length <= 24" },
+        "status": {
+          ".validate": "newData.isString() && newData.val().matches(/^(lobby|countdown|active|finished)$/)"
+        },
+        "playerCount": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 4"
+        },
+        "maxPlayers": { ".validate": "newData.isNumber()" },
+        "hostId": { ".validate": "newData.isString()" },
+        "updatedAt": { ".validate": "newData.isNumber()" },
+        "$other": { ".validate": false }
+      }
+    },
+    "rooms": {
+      ".read": "auth != null",
+      "$roomId": {
+        "meta": {
+          ".write": "auth != null && (!data.exists() || data.child('hostId').val() === auth.uid || !root.child('rooms').child($roomId).child('players').child(data.child('hostId').val()).exists())",
+          ".validate": "newData.hasChildren(['hostId','status','maxPlayers'])",
+          "hostId": { ".validate": "newData.isString()" },
+          "status": {
+            ".validate": "newData.isString() && newData.val().matches(/^(lobby|countdown|active|finished)$/)"
+          },
+          "arenaSeed": { ".validate": "newData.isNumber()" },
+          "winnerId": { ".validate": "newData.isString() || newData.val() == null" },
+          "countdownEndsAt": { ".validate": "newData.isNumber() || newData.val() == null" }
+        },
+        "players": {
+          "$uid": {
+            ".write": "auth != null && $uid === auth.uid",
+            ".validate": "newData.hasChildren(['name','colorIndex','ready','joinedAt'])",
+            "name": { ".validate": "newData.isString() && newData.val().length <= 24" },
+            "colorIndex": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3"
+            },
+            "ready": { ".validate": "newData.isBoolean()" },
+            "joinedAt": { ".validate": "newData.isNumber()" },
+            "presence": { ".validate": "newData.isBoolean()" },
+            "$other": { ".validate": false }
+          }
+        },
+        "states": {
+          "$uid": {
+            ".write": "auth != null && $uid === auth.uid",
+            ".validate": "newData.hasChildren(['x','z','yaw','health','alive','seq','t'])",
+            "x": { ".validate": "newData.isNumber()" },
+            "z": { ".validate": "newData.isNumber()" },
+            "yaw": { ".validate": "newData.isNumber()" },
+            "speed": { ".validate": "newData.isNumber()" },
+            "health": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"
+            },
+            "alive": { ".validate": "newData.isBoolean()" },
+            "seq": { ".validate": "newData.isNumber()" },
+            "t": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    }
+  }
+}

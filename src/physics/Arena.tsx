@@ -1,23 +1,31 @@
 import { CuboidCollider, RigidBody } from '@react-three/rapier';
 import { SIM_COLORS } from '@/theme/tokens.ts';
 import { TrainingComplex } from './arena/ArenaZones.tsx';
-import { ARENA_AXES, createWallDefs, FLOOR_PANELS } from './arena/arenaData.ts';
+import { ARENA_AXES, createWallDefsForSize, FLOOR_PANELS } from './arena/arenaData.ts';
 import { HazardPerimeter, SectorStencil } from './arena/IndustrialDecals.tsx';
+import { useArenaSize } from './arenaSize.ts';
 import { ARENA } from './constants.ts';
 import { GROUND_LAYER_Y } from './groundLayers.ts';
 
 const FLOOR_PANEL_Y = GROUND_LAYER_Y.floorPanel;
 const ARENA_AXIS_Y = GROUND_LAYER_Y.arenaAxis;
 
-export function Arena() {
-  const half = ARENA.size / 2;
+/**
+ * Арена. По умолчанию (одиночка/тренировки) — 18 м с полным тренировочным
+ * комплексом и разметкой зон. В сетевом бою рендерится внутри `ArenaSizeProvider`
+ * (размер берётся из `useArenaSize`) с `trainingComplex={false}` — большое чистое
+ * поле без зон/декалей, только пол, стены и hazard-периметр.
+ */
+export function Arena({ trainingComplex = true }: { trainingComplex?: boolean }) {
+  const arenaSize = useArenaSize();
+  const half = arenaSize / 2;
 
   return (
     <group>
       <RigidBody type="fixed" friction={0.95}>
         <CuboidCollider args={[half, 0.05, half]} position={[0, -0.05, 0]} />
         <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-          <planeGeometry args={[ARENA.size, ARENA.size, 32, 32]} />
+          <planeGeometry args={[arenaSize, arenaSize, 32, 32]} />
           <meshStandardMaterial
             color={SIM_COLORS.floorBase}
             emissive={SIM_COLORS.floorEmissive}
@@ -27,55 +35,57 @@ export function Arena() {
             roughness={0.92}
           />
         </mesh>
-        {FLOOR_PANELS.map((panel) => (
-          <mesh
-            key={panel.id}
-            receiveShadow
-            rotation={[-Math.PI / 2, 0, 0]}
-            position={[panel.position[0], FLOOR_PANEL_Y, panel.position[2]]}
-            renderOrder={1}
-          >
-            <planeGeometry args={panel.size} />
-            <meshBasicMaterial
-              color={panel.color}
-              transparent
-              opacity={panel.opacity}
-              polygonOffset
-              polygonOffsetFactor={-1}
-              polygonOffsetUnits={-1}
-              depthWrite={false}
-            />
-          </mesh>
-        ))}
-        <ArenaRings />
-        {ARENA_AXES.map((axis) => (
-          <mesh
-            key={axis.id}
-            rotation={[-Math.PI / 2, 0, axis.rotation]}
-            position={[0, ARENA_AXIS_Y, 0]}
-            renderOrder={2}
-          >
-            <planeGeometry args={[ARENA.size, 0.06]} />
-            <meshBasicMaterial
-              color={axis.color}
-              transparent
-              opacity={0.55}
-              polygonOffset
-              polygonOffsetFactor={-2}
-              polygonOffsetUnits={-2}
-              depthWrite={false}
-            />
-          </mesh>
-        ))}
+        {trainingComplex &&
+          FLOOR_PANELS.map((panel) => (
+            <mesh
+              key={panel.id}
+              receiveShadow
+              rotation={[-Math.PI / 2, 0, 0]}
+              position={[panel.position[0], FLOOR_PANEL_Y, panel.position[2]]}
+              renderOrder={1}
+            >
+              <planeGeometry args={panel.size} />
+              <meshBasicMaterial
+                color={panel.color}
+                transparent
+                opacity={panel.opacity}
+                polygonOffset
+                polygonOffsetFactor={-1}
+                polygonOffsetUnits={-1}
+                depthWrite={false}
+              />
+            </mesh>
+          ))}
+        {trainingComplex && <ArenaRings />}
+        {trainingComplex &&
+          ARENA_AXES.map((axis) => (
+            <mesh
+              key={axis.id}
+              rotation={[-Math.PI / 2, 0, axis.rotation]}
+              position={[0, ARENA_AXIS_Y, 0]}
+              renderOrder={2}
+            >
+              <planeGeometry args={[arenaSize, 0.06]} />
+              <meshBasicMaterial
+                color={axis.color}
+                transparent
+                opacity={0.55}
+                polygonOffset
+                polygonOffsetFactor={-2}
+                polygonOffsetUnits={-2}
+                depthWrite={false}
+              />
+            </mesh>
+          ))}
         <HazardPerimeter half={half} />
-        <SectorStencil />
+        {trainingComplex && <SectorStencil />}
       </RigidBody>
 
-      {createWallDefs().map((wall) => (
+      {createWallDefsForSize(arenaSize).map((wall) => (
         <ArenaWall key={wall.id} half={wall.half} position={wall.position} />
       ))}
 
-      <TrainingComplex />
+      {trainingComplex && <TrainingComplex />}
     </group>
   );
 }

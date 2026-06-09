@@ -59,6 +59,18 @@ export const ARENA_COLORS = {
   },
 } as const;
 
+/**
+ * Цвета четырёх игроков сетевого боя (по углам арены). Один силуэт модели, но
+ * уникальный, различимый hue из дизайн-системы: фиолетовый / голубой / зелёный /
+ * оранжевый. `body` — броня корпуса, `accent` — ротор/подсветка. Индекс = угол.
+ */
+export const PLAYER_COLORS = [
+  { body: SIM_COLORS.accentPurple, accent: '#b9a6ff', label: 'Фиолетовый' },
+  { body: SIM_COLORS.accentCyan, accent: '#9bdcff', label: 'Голубой' },
+  { body: ARENA_COLORS.garage.primary, accent: '#9af0bd', label: 'Зелёный' },
+  { body: ARENA_COLORS.crates.primary, accent: '#ffb37a', label: 'Оранжевый' },
+] as const;
+
 export const DAMAGE_EFFECT_COLORS = {
   scorch: '#ff5a3d',
   smoke: '#858b94',

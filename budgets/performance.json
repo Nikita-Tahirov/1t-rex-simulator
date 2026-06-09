@@ -1,6 +1,6 @@
 {
   "bundle": {
-    "maxTotalJsGzipKb": 2100,
+    "maxTotalJsGzipKb": 2260,
     "maxEntryJsGzipKb": 80,
     "maxCssGzipKb": 24,
     "maxRawChunkKb": 5000

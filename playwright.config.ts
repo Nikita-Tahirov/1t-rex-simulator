@@ -45,6 +45,9 @@ export default defineConfig({
         '--disable-gpu-vsync',
         '--disable-renderer-backgrounding',
         '--disable-background-timer-throttling',
+        // Перекрытые окна (вторая вкладка мультиплеер-e2e) не должны троттлиться:
+        // иначе фоновая вкладка публикует позы ~1 Гц и интерполяция «замерзает».
+        '--disable-backgrounding-occluded-windows',
       ],
     },
     trace: 'retain-on-failure',

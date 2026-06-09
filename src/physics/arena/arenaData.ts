@@ -9,7 +9,7 @@ import type {
 } from './types.ts';
 import { ZONE_CENTERS } from './zoneLayout.ts';
 
-export { createWallDefs } from './wallData.ts';
+export { createWallDefs, createWallDefsForSize } from './wallData.ts';
 
 /** Self-hosted шрифт drei `<Text>`-меток арены: без него drei тянет Roboto с CDN ↔ CSP `font-src 'self' data:`. */
 export const ARENA_TEXT_FONT_URL = '/fonts/Roboto-Regular.ttf';

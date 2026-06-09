@@ -44,6 +44,9 @@ export default defineConfig({
           if (!id.includes('node_modules')) return undefined;
           // Нормализуем path-разделители Windows для регекса
           const p = id.replace(/\\/g, '/');
+          // Firebase SDK — отдельный lazy-чанк: грузится только при выборе
+          // firebase-адаптера сетевого режима, в основной bundle не попадает.
+          if (p.includes('/firebase/') || p.includes('/@firebase/')) return 'vendor-firebase';
           if (p.includes('@dimforge/rapier3d-compat')) return 'vendor-rapier-core';
           if (p.includes('@react-three/rapier')) return 'vendor-rapier-r3f';
           if (p.includes('@react-three/drei')) return 'vendor-r3f-drei';

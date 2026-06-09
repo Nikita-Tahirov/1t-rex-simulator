@@ -5,6 +5,8 @@ import { ACESFilmicToneMapping, BasicShadowMap, PCFSoftShadowMap, SRGBColorSpace
 import { FpsCounter } from '@/hud/FpsCounter.tsx';
 import { HudPanel } from '@/hud/HudPanel.tsx';
 import { OnScreenControls } from '@/hud/OnScreenControls.tsx';
+import { NetModeButton } from '@/netgame/NetModeButton.tsx';
+import { useAppModeStore } from '@/netgame/store/appModeStore.ts';
 import { Arena } from '@/physics/Arena.tsx';
 import { ARENA, PHYSICS } from '@/physics/constants.ts';
 import { FollowCamera } from '@/physics/FollowCamera.tsx';
@@ -25,9 +27,28 @@ const ScenarioWrapper = lazy(() =>
   import('@/scenarios/ScenarioWrapper.tsx').then((m) => ({ default: m.ScenarioWrapper })),
 );
 
+// Сетевой режим грузится лениво и ТОЛЬКО при входе в него — в одиночке этот
+// модуль (и Firebase) не импортируется, поэтому solo-сцена и e2e не меняются.
+const NetGameRoot = lazy(() =>
+  import('@/netgame/NetGameRoot.tsx').then((m) => ({ default: m.NetGameRoot })),
+);
+
 function App() {
   const paused = useSimStore((s) => s.paused);
   const currentScenarioId = useScenarioStore((s) => s.currentScenarioId);
+  const appMode = useAppModeStore((s) => s.appMode);
+
+  // В сетевом режиме одиночная сцена размонтируется, а на её место встаёт
+  // ленивый сетевой оверлей. Solo-ветка ниже остаётся неизменной.
+  if (appMode === 'net') {
+    return (
+      <div className="relative h-full w-full">
+        <Suspense fallback={null}>
+          <NetGameRoot />
+        </Suspense>
+      </div>
+    );
+  }
   // PCFSoftShadowMap — мягкие тени для движущегося робота. На Firefox PCF-soft
   // упирается в багу draw-call-overhead на старых GPU → fallback на BasicShadowMap.
   const shadowMapType = isFirefoxBrowser() ? BasicShadowMap : PCFSoftShadowMap;
@@ -91,6 +112,7 @@ function App() {
       <FpsCounter />
       <HudPanel />
       <OnScreenControls />
+      <NetModeButton />
     </div>
   );
 }

@@ -8,6 +8,7 @@ export const test = base.extend({
     page.on('console', (message) => {
       const text = message.text().trim();
       if (message.type() === 'warning') {
+        if (isIgnorableGpuDriverNoise(text)) return;
         browserWarnings.push(`console: ${text}`);
         return;
       }
@@ -38,4 +39,12 @@ export { expect };
 
 function isIgnorableRequestFailure(errorText: string): boolean {
   return /ERR_ABORTED|NS_BINDING_ABORTED|aborted|canceled|cancelled/i.test(errorText);
+}
+
+// Локальные GPU-драйверы (ANGLE/Metal на macOS) шлют performance-advisory вида
+// «GL Driver Message … GPU stall due to ReadPixels» при чтении пикселей сценой
+// (SceneProbe). Это не предупреждение приложения, а шум окружения — на headless
+// CI без GPU его нет. Фильтруем узко, чтобы не маскировать настоящие warning'и.
+function isIgnorableGpuDriverNoise(text: string): boolean {
+  return /GL Driver Message|GPU stall/i.test(text);
 }

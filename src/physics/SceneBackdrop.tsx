@@ -1,5 +1,5 @@
 import { AdditiveBlending, BackSide } from 'three';
-import { ARENA } from './constants.ts';
+import { useArenaSize } from './arenaSize.ts';
 
 const SKY_VERTEX = `
 varying vec3 vWorldPosition;
@@ -43,6 +43,7 @@ void main() {
  * → быстрый cold start и стабильный COOP/COEP.
  */
 export function SceneBackdrop() {
+  const arenaSize = useArenaSize();
   return (
     <group>
       <mesh frustumCulled={false} renderOrder={-10}>
@@ -57,7 +58,7 @@ export function SceneBackdrop() {
         />
       </mesh>
 
-      <HorizonRing radius={ARENA.size * 1.22} y={0.04} color="#ffb340" opacity={0.06} />
+      <HorizonRing radius={arenaSize * 1.22} y={0.04} color="#ffb340" opacity={0.06} />
     </group>
   );
 }

@@ -55,6 +55,7 @@ docs/video/_recording
 # Test artefacts
 test-results
 playwright-report
+.playwright-mcp
 
 # Local agent runs and scratch
 .codex-run

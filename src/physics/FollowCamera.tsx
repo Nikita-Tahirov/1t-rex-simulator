@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Vector3 } from 'three';
 import { useSimStore } from '@/store/sim-store.ts';
 import { telemetry } from '@/store/telemetry.ts';
-import { ARENA } from './constants.ts';
+import { useArenaSize } from './arenaSize.ts';
 
 declare global {
   interface Window {
@@ -53,7 +53,6 @@ const POSITION_HALFLIFE_SEC = 0.18;
 const YAW_HALFLIFE_SEC = 0.12;
 /** Порог dead-zone позиции — ниже этого камера не реагирует (солвер-jitter). */
 const POSITION_DEADZONE_M = 0.0015;
-const TOP_DOWN_CAMERA_Y = ARENA.size * 1.16;
 
 /** Frame-rate independent damp. Возвращает `t` для `lerp(a, b, t)`. */
 function dampT(halflife: number, dt: number): number {
@@ -71,6 +70,7 @@ function dampAngle(current: number, target: number, halflife: number, dt: number
 
 export function FollowCamera() {
   const cameraMode = useSimStore((s) => s.cameraMode);
+  const topDownY = useArenaSize() * 1.16;
   const controlsRef = useRef<CameraControls>(null);
   const camera = useThree((s) => s.camera);
   const tmpTarget = useRef(new Vector3());
@@ -87,10 +87,10 @@ export function FollowCamera() {
   useEffect(() => {
     const controls = controlsRef.current;
     if (cameraMode === 'top-down') {
-      controls?.setLookAt(0, TOP_DOWN_CAMERA_Y, 0.001, 0, 0, 0, false);
+      controls?.setLookAt(0, topDownY, 0.001, 0, 0, 0, false);
       publishCameraState(cameraMode, camera.position, tmpTarget.current.set(0, 0, 0));
       window.requestAnimationFrame(() => {
-        controlsRef.current?.setLookAt(0, TOP_DOWN_CAMERA_Y, 0.001, 0, 0, 0, false);
+        controlsRef.current?.setLookAt(0, topDownY, 0.001, 0, 0, 0, false);
       });
     } else if (cameraMode === 'orbit') {
       orbitResetFrames.current = 12;
@@ -108,7 +108,7 @@ export function FollowCamera() {
       justEntered.current = true;
       lastDrivenMode.current = null;
     }
-  }, [camera, cameraMode]);
+  }, [camera, cameraMode, topDownY]);
 
   useFrame((_, dt) => {
     if (cameraMode === 'orbit') {

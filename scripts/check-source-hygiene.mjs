@@ -55,6 +55,8 @@ const roots = new Set([
   path.join(root, 'src', 'store', 'index.ts'),
   path.join(root, 'src', 'lib', 'index.ts'),
   path.join(root, 'src', 'types', 'troika-three-text.d.ts'),
+  // Ambient-типизация клиентских env Vite (ImportMetaEnv) — не импортируется рантаймом.
+  path.join(root, 'src', 'vite-env.d.ts'),
 ]);
 
 for (const script of Object.values(packageJson.scripts ?? {})) {
