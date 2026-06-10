@@ -23,16 +23,11 @@ export interface AppModeState {
   appMode: AppMode;
   netScreen: NetScreen;
   /**
-   * Кадр «заморозки» solo-RAF перед размонтажом одиночной сцены. Пока `true`,
-   * `App` рендерит `<Canvas frameloop="never">` → useFrame'ы (включая шаг Rapier)
-   * не выполняются, и последующий unmount не дёргает уже освобождённый WASM-мир.
+   * Войти в сетевой режим. Solo-сцена при этом НЕ размонтируется, а прячется
+   * (см. App.tsx): снос живого Rapier-мира — библиотечная гонка teardown'а.
    */
-  leavingSolo: boolean;
-  /** Шаг 1 входа в сеть: заморозить solo-RAF (фактический переход — `enterNet`). */
-  requestEnterNet: () => void;
-  /** Шаг 2: войти в сетевой режим (открывает стартовое меню сети). */
   enterNet: () => void;
-  /** Вернуться в одиночную игру (размонтирует сетевой оверлей). */
+  /** Вернуться в одиночную игру (показывает скрытую solo-сцену, мир жив). */
   exitNet: () => void;
   setNetScreen: (screen: NetScreen) => void;
 }
@@ -40,23 +35,16 @@ export interface AppModeState {
 export const useAppModeStore = create<AppModeState>()((set) => ({
   appMode: 'solo',
   netScreen: 'menu',
-  leavingSolo: false,
-  // Двухфазный уход из solo: сначала останавливаем RAF-цикл одиночной сцены,
-  // и лишь следующим кадром (когда useFrame'ы заведомо не выполняются) `App`
-  // размонтирует `<Physics>`. Иначе освобождение Rapier-мира гонится с в-полёте
-  // useFrame'ами → пачка «null pointer passed to rust» в консоли (косметика, но
-  // видно в devtools). См. эффект в `App.tsx`.
-  requestEnterNet: () => set({ leavingSolo: true }),
   // Чистый старт сессии при входе: сбрасываем прошлую комнату (имя игрока
   // сохраняется). Сброс делается ЗДЕСЬ, а не в cleanup провайдера, чтобы
   // suspend-remount боевой сцены не выкидывал игрока из комнаты.
   enterNet: () => {
     useNetRoomStore.getState().leaveRoom();
-    set({ appMode: 'net', netScreen: 'menu', leavingSolo: false });
+    set({ appMode: 'net', netScreen: 'menu' });
   },
   exitNet: () => {
     useNetRoomStore.getState().leaveRoom();
-    set({ appMode: 'solo', netScreen: 'menu', leavingSolo: false });
+    set({ appMode: 'solo', netScreen: 'menu' });
   },
   setNetScreen: (screen) => set({ netScreen: screen }),
 }));
