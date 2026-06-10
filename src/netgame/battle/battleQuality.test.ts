@@ -18,6 +18,15 @@ describe('initialBattleQuality', () => {
       maxDpr: 1.25,
     });
   });
+
+  it('physics-tier: слабые устройства → lite, нормальные → full (адаптивная деградация)', () => {
+    // слабый телефон (≤4 ядра) или совсем малоядерный десктоп → кинематика
+    expect(initialBattleQuality({ mobile: true, cores: 4 }).physicsTier).toBe('lite');
+    expect(initialBattleQuality({ mobile: false, cores: 2 }).physicsTier).toBe('lite');
+    // хороший телефон (≥6 ядер) и десктоп → полная динамика
+    expect(initialBattleQuality({ mobile: true, cores: 8 }).physicsTier).toBe('full');
+    expect(initialBattleQuality({ mobile: false, cores: 8 }).physicsTier).toBe('full');
+  });
 });
 
 describe('dprFromFactor', () => {

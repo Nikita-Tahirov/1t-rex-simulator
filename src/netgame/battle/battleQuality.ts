@@ -40,19 +40,26 @@ export function detectDevice(): DeviceHint {
 }
 
 /**
- * Стартовое качество боя по устройству. Мобильные/малоядерные — без теней,
- * физика на 1/30. Уровень физики `full` (динамика) по умолчанию даже на слабых
- * (нужен реализм); `PerformanceMonitor` понизит до `lite` при стойкой просадке.
+ * Стартовое качество боя по устройству (адаптивная physics-LOD деградация).
+ *
+ * Уровень физики выбирается ОДИН раз на старте боя и не переключается в матче —
+ * смена tier перемонтирует тела и сбросила бы позиции. Динамическая физика 4
+ * роботов (шасси+ротор) CPU-затратна, поэтому очень слабые устройства (слабый
+ * телефон ≤4 ядер или ≤2 ядра вообще) откатываются на лёгкую кинематику (`lite`),
+ * а нормальные телефоны (≥6 ядер) и десктоп получают полную физику (`full`).
+ * DPR/тени продолжает подстраивать `PerformanceMonitor` в рантайме (не disruptive).
  */
 export function initialBattleQuality(device: DeviceHint): BattleQuality {
   const lowEnd = device.mobile || device.cores <= 4;
+  const physicsTier: BattlePhysicsTier =
+    (device.mobile && device.cores <= 4) || device.cores <= 2 ? 'lite' : 'full';
   if (lowEnd) {
     return {
       shadows: false,
       shadowMapSize: 1024,
       maxDpr: 1,
       antialias: false,
-      physicsTier: 'full',
+      physicsTier,
       physicsTimeStep: 1 / 30,
     };
   }
@@ -61,7 +68,7 @@ export function initialBattleQuality(device: DeviceHint): BattleQuality {
     shadowMapSize: 1024,
     maxDpr: 1.25,
     antialias: true,
-    physicsTier: 'full',
+    physicsTier,
     physicsTimeStep: 1 / 60,
   };
 }
