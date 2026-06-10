@@ -2,11 +2,42 @@ import { describe, expect, it } from 'vitest';
 import { pushSnapshot, type SampledPose, type Snapshot, sampleSnapshots } from './interpolation.ts';
 
 function snap(t: number, x: number, yaw = 0): Snapshot {
-  return { t, x, z: 0, yaw, speed: 1, spinnerRpm: 0, health: 1000, alive: true };
+  return {
+    t,
+    x,
+    y: 0,
+    z: 0,
+    yaw,
+    qx: 0,
+    qy: 0,
+    qz: 0,
+    qw: 1,
+    speed: 1,
+    vx: Math.cos(yaw),
+    vz: Math.sin(yaw),
+    spinnerRpm: 0,
+    health: 1000,
+    alive: true,
+  };
 }
 
 function emptyPose(): SampledPose {
-  return { x: 0, z: 0, yaw: 0, speed: 0, spinnerRpm: 0, health: 0, alive: false };
+  return {
+    x: 0,
+    y: 0,
+    z: 0,
+    yaw: 0,
+    qx: 0,
+    qy: 0,
+    qz: 0,
+    qw: 1,
+    speed: 0,
+    vx: 0,
+    vz: 0,
+    spinnerRpm: 0,
+    health: 0,
+    alive: false,
+  };
 }
 
 describe('pushSnapshot', () => {

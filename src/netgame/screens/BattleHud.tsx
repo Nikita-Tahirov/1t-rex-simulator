@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ROBOT_MAX_HEALTH } from '@/physics/robotDamage.ts';
 import { applyRobotDamage } from '@/store/robotIntegrity.ts';
+import { useSimStore } from '@/store/sim-store.ts';
 import { telemetry } from '@/store/telemetry.ts';
 import { isParticipantAlive, playersByJoinOrder } from '../net/match.ts';
 import { useNetSessionContext } from '../session/netSessionContext.ts';
@@ -17,6 +18,8 @@ const HEALTH_SAMPLE_MS = 120;
 export function BattleHud({ active, countdownEnd }: { active: boolean; countdownEnd: number }) {
   const { room, uid, leaveRoom } = useNetSessionContext();
   const { health: selfHealth, now } = useBattleClock();
+  const cameraMode = useSimStore((s) => s.cameraMode);
+  const setCameraMode = useSimStore((s) => s.setCameraMode);
 
   if (!room || !uid) return null;
 
@@ -46,6 +49,16 @@ export function BattleHud({ active, countdownEnd }: { active: boolean; countdown
           </span>
         </div>
       )}
+
+      {/* top-left: переключатель камеры «со спины» / «следом». */}
+      <button
+        type="button"
+        className="sim-control pointer-events-auto absolute top-4 left-4 px-3 py-1.5 text-sm"
+        data-testid="camera-toggle"
+        onClick={() => setCameraMode(cameraMode === 'shoulder' ? 'follow' : 'shoulder')}
+      >
+        {cameraMode === 'shoulder' ? NET_STRINGS.cameraShoulder : NET_STRINGS.cameraFollow}
+      </button>
 
       {/* top-center: не конфликтует с тач-управлением (слева) и соперниками (справа). */}
       <div className="sim-panel pointer-events-auto absolute top-4 left-1/2 w-56 -translate-x-1/2 p-3">

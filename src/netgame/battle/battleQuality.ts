@@ -7,6 +7,10 @@
  * detect-gpu базы), а дальше DPR подстраивает `PerformanceMonitor` по реальному FPS.
  */
 
+import type { BattlePhysicsTier } from '@/physics/battle/battleRobotTypes.ts';
+
+export type { BattlePhysicsTier };
+
 export interface BattleQuality {
   /** Включить shadow map (самая дорогая статья на слабых GPU). */
   shadows: boolean;
@@ -15,6 +19,10 @@ export interface BattleQuality {
   /** Верхняя граница DPR (нижнюю подбирает PerformanceMonitor). */
   maxDpr: number;
   antialias: boolean;
+  /** Уровень физики: `full` — динамические Rapier-тела; `lite` — кинематика. */
+  physicsTier: BattlePhysicsTier;
+  /** Шаг физики, с (мобильные/слабые — 1/30 ради CPU). */
+  physicsTimeStep: number;
 }
 
 export interface DeviceHint {
@@ -31,13 +39,38 @@ export function detectDevice(): DeviceHint {
   };
 }
 
-/** Стартовое качество боя по устройству. Мобильные/малоядерные — без теней. */
+/**
+ * Стартовое качество боя по устройству (адаптивная physics-LOD деградация).
+ *
+ * Уровень физики выбирается ОДИН раз на старте боя и не переключается в матче —
+ * смена tier перемонтирует тела и сбросила бы позиции. Динамическая физика 4
+ * роботов (шасси+ротор) CPU-затратна, поэтому очень слабые устройства (слабый
+ * телефон ≤4 ядер или ≤2 ядра вообще) откатываются на лёгкую кинематику (`lite`),
+ * а нормальные телефоны (≥6 ядер) и десктоп получают полную физику (`full`).
+ * DPR/тени продолжает подстраивать `PerformanceMonitor` в рантайме (не disruptive).
+ */
 export function initialBattleQuality(device: DeviceHint): BattleQuality {
   const lowEnd = device.mobile || device.cores <= 4;
+  const physicsTier: BattlePhysicsTier =
+    (device.mobile && device.cores <= 4) || device.cores <= 2 ? 'lite' : 'full';
   if (lowEnd) {
-    return { shadows: false, shadowMapSize: 1024, maxDpr: 1, antialias: false };
+    return {
+      shadows: false,
+      shadowMapSize: 1024,
+      maxDpr: 1,
+      antialias: false,
+      physicsTier,
+      physicsTimeStep: 1 / 30,
+    };
   }
-  return { shadows: true, shadowMapSize: 1024, maxDpr: 1.25, antialias: true };
+  return {
+    shadows: true,
+    shadowMapSize: 1024,
+    maxDpr: 1.25,
+    antialias: true,
+    physicsTier,
+    physicsTimeStep: 1 / 60,
+  };
 }
 
 /** Нижняя граница DPR при сильной просадке FPS. */

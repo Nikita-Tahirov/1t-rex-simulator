@@ -51,6 +51,12 @@ export const CollisionGroup = {
    * issue на trimesh/wedge внутри convex hull (dimforge/rapier#417, #331).
    */
   RampSurface: 4,
+  /** Боевой режим: динамическое шасси ЛОКАЛЬНОГО робота. */
+  BattleLocalChassis: 5,
+  /** Боевой режим: диск ротора ЛОКАЛЬНОГО робота. */
+  BattleLocalRotor: 6,
+  /** Боевой режим: кинематические прокси удалённых роботов. */
+  BattleProxy: 7,
 } as const;
 
 /** Корпус робота сталкивается только с ареной. С колёсами и диском — нет
@@ -76,4 +82,26 @@ export const SPINNER_COLLISION_GROUPS = interactionGroups(CollisionGroup.Spinner
  * прозрачны для шасси/колёс/диска робота. */
 export const RAMP_COLLISION_GROUPS = interactionGroups(CollisionGroup.RampSurface, [
   CollisionGroup.Arena,
+]);
+
+/**
+ * Боевые группы (только сетевой бой). На каждом клиенте РОВНО ОДИН локальный
+ * робот, поэтому его шасси и ротор — единственные члены своих групп; они НЕ
+ * сталкиваются друг с другом (фильтр это исключает), что снимает само-контакт
+ * ротора с корпусом без хаков. Чужие роботы — кинематические прокси (`BattleProxy`),
+ * солидные препятствия, в которые локальный робот упирается/наезжает и которые
+ * задевает ротором. Прокси между собой не сталкиваются (ведутся сетью).
+ */
+export const BATTLE_LOCAL_CHASSIS_GROUPS = interactionGroups(CollisionGroup.BattleLocalChassis, [
+  CollisionGroup.Arena,
+  CollisionGroup.BattleProxy,
+]);
+export const BATTLE_LOCAL_ROTOR_GROUPS = interactionGroups(CollisionGroup.BattleLocalRotor, [
+  CollisionGroup.Arena,
+  CollisionGroup.BattleProxy,
+]);
+export const BATTLE_PROXY_GROUPS = interactionGroups(CollisionGroup.BattleProxy, [
+  CollisionGroup.Arena,
+  CollisionGroup.BattleLocalChassis,
+  CollisionGroup.BattleLocalRotor,
 ]);

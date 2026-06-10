@@ -27,11 +27,21 @@ describe('snapshotMapping — граница unknown→typed', () => {
     expect(normalizeState({ x: 1.5, health: 700, alive: true })).toMatchObject({
       x: 1.5,
       z: 0,
+      y: 0,
       health: 700,
       alive: true,
       spinnerRpm: 0,
+      qw: 1, // дефолт-ориентация — идентичность
+      vx: 0,
       dealt: {},
     });
+  });
+
+  it('нормализует полную 3D-позу (высота, кватернион, скорости)', () => {
+    const s = normalizeState({ y: 0.4, qx: 0.1, qy: 0.2, qz: 0.3, qw: 0.9, vx: 2, vz: -1 });
+    expect(s.y).toBe(0.4);
+    expect([s.qx, s.qy, s.qz, s.qw]).toEqual([0.1, 0.2, 0.3, 0.9]);
+    expect([s.vx, s.vz]).toEqual([2, -1]);
   });
 
   it('нормализует spinnerRpm и dealt, отбрасывая мусор', () => {

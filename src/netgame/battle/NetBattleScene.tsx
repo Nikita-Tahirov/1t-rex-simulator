@@ -106,7 +106,7 @@ export function NetBattleScene() {
           <Preload all />
           <SceneBackdrop />
           <SceneLighting castShadow={shadowsLive} shadowMapSize={quality.shadowMapSize} />
-          <Physics paused>
+          <Physics timeStep={quality.physicsTimeStep} interpolate>
             <Arena trainingComplex={false} />
             {configs.map((config) => (
               <BattleRobot
@@ -114,6 +114,7 @@ export function NetBattleScene() {
                 config={config}
                 arenaSize={BATTLE_ARENA_SIZE}
                 active={active}
+                physicsTier={quality.physicsTier}
               />
             ))}
           </Physics>
