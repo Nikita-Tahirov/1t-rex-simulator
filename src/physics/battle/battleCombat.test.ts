@@ -3,6 +3,7 @@ import {
   addDealtDamage,
   approachSpeed,
   type CombatPose,
+  dealMeleeDamage,
   dealtRecord,
   decaySpinnerRpm,
   frontDot,
@@ -54,8 +55,8 @@ describe('approachSpeed (односторонняя скорость сближ�
 describe('frontDot (фронтальный сектор спиннера)', () => {
   it('цель прямо по носу → ~1, сзади → отрицательно', () => {
     const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 };
-    expect(frontDot(self, { x: 2, z: 0, yaw: 0, speed: 0 })).toBeCloseTo(1, 5);
-    expect(frontDot(self, { x: -2, z: 0, yaw: 0, speed: 0 })).toBeCloseTo(-1, 5);
+    expect(frontDot(self, { x: 2, z: 0 })).toBeCloseTo(1, 5);
+    expect(frontDot(self, { x: -2, z: 0 })).toBeCloseTo(-1, 5);
   });
 });
 
@@ -97,5 +98,49 @@ describe('incomingDelta (применение жертвой по дельте)'
 
   it('падение счётчика (рестарт матча) — новый базис без урона', () => {
     expect(incomingDelta(20, 300)).toEqual({ delta: 0, next: 20 });
+  });
+});
+
+describe('dealMeleeDamage (нанесение тарана/спиннера за кадр)', () => {
+  it('раскрученный спиннер бьёт врага ПРЯМО ПО НОСУ (проблема 2)', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 }; // стоит, нос в +X
+    dealMeleeDamage(
+      self,
+      [{ x: 1.2, z: 0 }],
+      ['enemy'],
+      SPINNER_MAX_RPM,
+      1000,
+      new Map(),
+      new Map(),
+    );
+    expect(dealtRecord().enemy).toBe(Math.round(spinnerDamage(SPINNER_MAX_RPM)));
+  });
+
+  it('спиннер НЕ бьёт врага позади (вне фронтального сектора), стоящий не таранит', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 };
+    dealMeleeDamage(
+      self,
+      [{ x: -1.2, z: 0 }],
+      ['enemy'],
+      SPINNER_MAX_RPM,
+      1000,
+      new Map(),
+      new Map(),
+    );
+    expect(dealtRecord()).toEqual({});
+  });
+
+  it('таран движущегося в упор наносит урон даже без спиннера', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 6 }; // едет в +X на цель
+    dealMeleeDamage(self, [{ x: 1.0, z: 0 }], ['enemy'], 0, 1000, new Map(), new Map());
+    expect(dealtRecord().enemy).toBeGreaterThan(0);
+  });
+
+  it('кулдаун: два кадра в пределах окна дают один удар', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 };
+    const lastSpin = new Map<string, number>();
+    dealMeleeDamage(self, [{ x: 1.2, z: 0 }], ['e'], SPINNER_MAX_RPM, 1000, new Map(), lastSpin);
+    dealMeleeDamage(self, [{ x: 1.2, z: 0 }], ['e'], SPINNER_MAX_RPM, 1100, new Map(), lastSpin);
+    expect(dealtRecord().e).toBe(Math.round(spinnerDamage(SPINNER_MAX_RPM)));
   });
 });

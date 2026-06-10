@@ -40,6 +40,12 @@ export interface CombatPose {
   speed: number;
 }
 
+/** Минимум для позиционной цели (соперник): координаты на плоскости. */
+export interface Point {
+  x: number;
+  z: number;
+}
+
 /** Шаг оборотов спиннера: R разгоняет, F тормозит, иначе держит. Кинематически. */
 export function stepSpinnerRpm(rpm: number, up: boolean, down: boolean, dt: number): number {
   if (up) return Math.min(SPINNER_MAX_RPM, rpm + SPINNER_SPINUP_RPM_PER_S * dt);
@@ -57,7 +63,7 @@ export function decaySpinnerRpm(rpm: number, dt: number): number {
  * на направление к цели), м/с. В отличие от симметричной closingSpeed зависит
  * только от движения атакующего: стоящий робот не «таранит» и не бьёт сам себя.
  */
-export function approachSpeed(self: CombatPose, other: CombatPose): number {
+export function approachSpeed(self: CombatPose, other: Point): number {
   const myVx = Math.cos(self.yaw) * self.speed;
   const myVz = Math.sin(self.yaw) * self.speed;
   const dirX = other.x - self.x;
@@ -68,7 +74,7 @@ export function approachSpeed(self: CombatPose, other: CombatPose): number {
 }
 
 /** Косинус угла между носом атакующего и направлением на цель (фронт спиннера). */
-export function frontDot(self: CombatPose, other: CombatPose): number {
+export function frontDot(self: CombatPose, other: Point): number {
   const dirX = other.x - self.x;
   const dirZ = other.z - self.z;
   const dist = Math.hypot(dirX, dirZ);
@@ -124,4 +130,46 @@ export function incomingDelta(
 ): { delta: number; next: number } {
   if (applied === undefined || observed <= applied) return { delta: 0, next: observed };
   return { delta: observed - applied, next: observed };
+}
+
+/**
+ * Наносит melee-урон (таран + спиннер) соперникам в досягаемости за один кадр и
+ * копит его через {@link addDealtDamage}. `poses`/`uids` — параллельные массивы
+ * живых соперников (без аллокаций в hot-path). Кулдауны per-victim хранятся в
+ * переданных Map. Таран — по своей скорости сближения; спиннер — во фронтальном
+ * секторе при активных оборотах. Чистая по отношению к аргументам (трогает лишь
+ * накопитель и переданные Map), поэтому тестируется детерминированно.
+ */
+export function dealMeleeDamage(
+  self: CombatPose,
+  poses: readonly Point[],
+  uids: readonly string[],
+  rpm: number,
+  now: number,
+  lastRamAt: Map<string, number>,
+  lastSpinAt: Map<string, number>,
+): void {
+  for (let i = 0; i < poses.length; i += 1) {
+    const target = poses[i]!;
+    const vid = uids[i]!;
+    const dist = Math.hypot(target.x - self.x, target.z - self.z);
+    if (dist <= RAM_REACH_M) {
+      const dmg = ramDamage(approachSpeed(self, target));
+      if (dmg > 0 && now - (lastRamAt.get(vid) ?? -Infinity) >= PVP_HIT_COOLDOWN_MS) {
+        addDealtDamage(vid, dmg);
+        lastRamAt.set(vid, now);
+      }
+    }
+    if (
+      dist <= SPINNER_REACH_M &&
+      rpm >= SPINNER_ACTIVE_RPM &&
+      frontDot(self, target) > SPINNER_FRONT_DOT
+    ) {
+      const dmg = spinnerDamage(rpm);
+      if (dmg > 0 && now - (lastSpinAt.get(vid) ?? -Infinity) >= PVP_HIT_COOLDOWN_MS) {
+        addDealtDamage(vid, dmg);
+        lastSpinAt.set(vid, now);
+      }
+    }
+  }
 }

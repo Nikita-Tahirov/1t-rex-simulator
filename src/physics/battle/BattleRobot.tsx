@@ -15,19 +15,10 @@ import {
   stepArcade,
 } from './battleArcade.ts';
 import {
-  addDealtDamage,
-  approachSpeed,
   type CombatPose,
+  dealMeleeDamage,
   decaySpinnerRpm,
-  frontDot,
-  PVP_HIT_COOLDOWN_MS,
-  RAM_REACH_M,
-  ramDamage,
   resetDealtDamage,
-  SPINNER_ACTIVE_RPM,
-  SPINNER_FRONT_DOT,
-  SPINNER_REACH_M,
-  spinnerDamage,
   stepSpinnerRpm,
 } from './battleCombat.ts';
 import {
@@ -156,12 +147,17 @@ function LocalBattleRobot({ config, arenaSize, active }: BattleRobotProps) {
       }
       // Урон соперникам наносим МЫ (атакующий) — таран по своей скорости сближения
       // и спиннер во фронтальном секторе. Жертва применит его по дельте `dealt`.
-      dealDamageToEnemies(
-        selfPose.current,
-        p,
-        spinnerRpm.current,
+      const self = selfPose.current;
+      self.x = p.x;
+      self.z = p.z;
+      self.yaw = p.yaw;
+      self.speed = p.speed;
+      dealMeleeDamage(
+        self,
         otherPoses.current,
         otherUids.current,
+        spinnerRpm.current,
+        performance.now(),
         lastRamAt.current,
         lastSpinAt.current,
       );
@@ -226,46 +222,6 @@ function collectOthers(selfUid: string, poses: BattlePose[], uids: string[]): vo
     if (id !== selfUid && other.alive) {
       poses.push(other);
       uids.push(id);
-    }
-  }
-}
-
-/** Наносит соперникам урон тараном и спиннером (накопителем `dealt`). */
-function dealDamageToEnemies(
-  self: CombatPose,
-  p: ArcadePose,
-  rpm: number,
-  poses: readonly BattlePose[],
-  uids: readonly string[],
-  lastRamAt: Map<string, number>,
-  lastSpinAt: Map<string, number>,
-): void {
-  self.x = p.x;
-  self.z = p.z;
-  self.yaw = p.yaw;
-  self.speed = p.speed;
-  const now = performance.now();
-  for (let i = 0; i < poses.length; i += 1) {
-    const target = poses[i]!;
-    const vid = uids[i]!;
-    const dist = Math.hypot(target.x - p.x, target.z - p.z);
-    if (dist <= RAM_REACH_M) {
-      const dmg = ramDamage(approachSpeed(self, target));
-      if (dmg > 0 && now - (lastRamAt.get(vid) ?? -Infinity) >= PVP_HIT_COOLDOWN_MS) {
-        addDealtDamage(vid, dmg);
-        lastRamAt.set(vid, now);
-      }
-    }
-    if (
-      dist <= SPINNER_REACH_M &&
-      rpm >= SPINNER_ACTIVE_RPM &&
-      frontDot(self, target) > SPINNER_FRONT_DOT
-    ) {
-      const dmg = spinnerDamage(rpm);
-      if (dmg > 0 && now - (lastSpinAt.get(vid) ?? -Infinity) >= PVP_HIT_COOLDOWN_MS) {
-        addDealtDamage(vid, dmg);
-        lastSpinAt.set(vid, now);
-      }
     }
   }
 }
