@@ -17,8 +17,11 @@ export async function createNetworkPort(): Promise<NetworkPort> {
     try {
       const { createFirebasePort } = await import('./firebaseAdapter.ts');
       return await createFirebasePort();
-    } catch {
-      // Firebase недоступен/мисконфиг → деградируем до in-memory (без падения UI).
+    } catch (caught) {
+      // Firebase недоступен/мисконфиг → деградируем до in-memory (без падения
+      // UI), но НЕ молча: пользователь увидит бейдж локального режима по
+      // port.kind, а причина сбоя остаётся в консоли для диагностики.
+      console.error('[netgame] Firebase init не удался — локальный in-memory режим:', caught);
     }
   }
   return createInMemoryPort(getClientId(), { crossTab: typeof window !== 'undefined' });

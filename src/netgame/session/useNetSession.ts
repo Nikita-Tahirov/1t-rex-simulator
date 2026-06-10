@@ -52,6 +52,7 @@ export function useNetSession(): NetSession {
       }
       portRef.current = port;
       useNetRoomStore.getState().setUid(port.uid);
+      useNetRoomStore.getState().setAdapterKind(port.kind);
       unsubList = port.listRooms((next) => useNetRoomStore.getState().setRooms(next));
     });
     // Намеренно НЕ сбрасываем roomId в cleanup: провайдер может пере-монтироваться

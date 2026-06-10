@@ -56,17 +56,37 @@ function applyPressedState(state: KeyboardState, key: keyof KeyboardState): void
   if (key === 'right') state.left = false;
 }
 
+/**
+ * Ввод в текстовое поле не должен управлять роботом и, главное, не должен
+ * глушиться `preventDefault`: KEY_MAP матчит ФИЗИЧЕСКИЕ коды (KeyW/KeyA/…),
+ * которые в русской раскладке — буквы «ц/ф/ы/в/к/а/ч» и пробел. Без этой
+ * проверки скрытая solo-сцена (keep-alive при сетевом режиме) съедала половину
+ * символов в полях имени игрока/комнаты.
+ */
+export function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.isContentEditable === true
+  );
+}
+
 export function useKeyboard(): React.RefObject<KeyboardState> {
   const ref = useRef<KeyboardState>({ ...initial });
 
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
+      if (isEditableTarget(e.target)) return;
       const key = KEY_MAP[e.code];
       if (key) {
         applyPressedState(ref.current, key);
         e.preventDefault();
       }
     };
+    // keyup НЕ фильтруем по editable: отпускание не мешает вводу (нет
+    // preventDefault), а пропуск keyup залипал бы клавишей, зажатой до фокуса.
     const onUp = (e: KeyboardEvent) => {
       const key = KEY_MAP[e.code];
       if (key) ref.current[key] = false;

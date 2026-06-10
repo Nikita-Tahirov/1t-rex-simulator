@@ -15,8 +15,15 @@ export interface NetRoomState {
   rooms: RoomListItem[];
   playerName: string;
   error: string | null;
+  /**
+   * Фактический транспорт порта (null — ещё подключаемся). `memory` при
+   * ожидавшемся firebase = деградация: комнаты видны только в этом браузере,
+   * UI обязан показать предупреждение.
+   */
+  adapterKind: 'firebase' | 'memory' | null;
 
   setUid: (uid: string | null) => void;
+  setAdapterKind: (kind: 'firebase' | 'memory' | null) => void;
   setRoomId: (roomId: string | null) => void;
   setRoom: (room: RoomSnapshot | null) => void;
   setRooms: (rooms: RoomListItem[]) => void;
@@ -33,8 +40,10 @@ export const useNetRoomStore = create<NetRoomState>()((set) => ({
   rooms: [],
   playerName: '',
   error: null,
+  adapterKind: null,
 
   setUid: (uid) => set({ uid }),
+  setAdapterKind: (adapterKind) => set({ adapterKind }),
   setRoomId: (roomId) => set({ roomId }),
   setRoom: (room) => set({ room }),
   setRooms: (rooms) => set({ rooms }),

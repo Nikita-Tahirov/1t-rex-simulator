@@ -25,6 +25,8 @@ export interface RoomListItem {
   playerCount: number;
   maxPlayers: number;
   hostId: string;
+  /** Серверное время последнего обновления записи, мс (0 — нет данных). */
+  updatedAt: number;
 }
 
 /** Игрок в комнате (лобби-уровень, редкие изменения). */

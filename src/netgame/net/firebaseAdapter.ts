@@ -14,6 +14,7 @@ import { getFirebaseHandles } from './firebaseClient.ts';
 import { getFirebaseConfig } from './firebaseConfig.ts';
 import { assignStartCorners, nextColorIndex, playersByJoinOrder } from './match.ts';
 import type { NetworkPort } from './NetworkPort.ts';
+import { SWEEP_MIN_INTERVAL_MS, sweepCandidates } from './roomSweep.ts';
 import { normalizeRoom, normalizeRoomList } from './snapshotMapping.ts';
 import { MAX_PLAYERS, type RoomSnapshot } from './types.ts';
 
@@ -24,6 +25,14 @@ import { MAX_PLAYERS, type RoomSnapshot } from './types.ts';
  * `meta`. Presence — через `onDisconnect` (узлы игрока/состояния удаляются при
  * обрыве). Лёгкий `roomsIndex` обслуживает общий список комнат. Внешний JSON
  * нормализуется на границе (`snapshotMapping`).
+ *
+ * Согласованность: связанные записи (создание комнаты, смена статуса в meta и
+ * в индексе) выполняются ОДНИМ атомарным multi-path `update` — раньше серия
+ * отдельных await'ов оставляла комнату без индекса или индекс без комнаты при
+ * обрыве посередине. `playerCount` индекса всегда пересчитывается из СВЕЖЕГО
+ * снапшота `players` после своей записи (самокорректирующийся), а не из
+ * прочитанного до неё (гонка двух одновременных входов/выходов). Комнаты-призраки
+ * подчищает opportunistic-уборка при подписке на список (`roomSweep`).
  *
  * Грузится ленивым чанком (вместе с Firebase SDK) только при выборе firebase —
  * bundle одиночки не тяжелеет.
@@ -45,6 +54,7 @@ export async function createFirebasePort(): Promise<NetworkPort> {
   const playerRef = (roomId: string) => ref(db, `rooms/${roomId}/players/${uid}`);
   const stateRef = (roomId: string) => ref(db, `rooms/${roomId}/states/${uid}`);
   const indexRef = (roomId: string) => ref(db, `roomsIndex/${roomId}`);
+  let lastSweepAt = 0;
 
   const readRoom = async (roomId: string): Promise<RoomSnapshot | null> => {
     const snapshot = await get(ref(db, `rooms/${roomId}`));
@@ -57,11 +67,51 @@ export async function createFirebasePort(): Promise<NetworkPort> {
     await onDisconnect(stateRef(roomId)).remove();
   };
 
+  /**
+   * Пересчитать `playerCount` индекса из СВЕЖЕГО `players`; пустая комната
+   * удаляется целиком (правила это разрешают: players пуст). Самокорректирует
+   * любую гонку join/leave: побеждает последний пересчёт, а не stale-снимок.
+   */
+  const reconcileIndex = async (roomId: string): Promise<void> => {
+    const snap = await get(ref(db, `rooms/${roomId}/players`));
+    const count = snap.exists() ? Object.keys(snap.val() as Record<string, unknown>).length : 0;
+    if (count === 0) {
+      await remove(ref(db, `rooms/${roomId}`));
+      await remove(indexRef(roomId));
+      return;
+    }
+    await update(indexRef(roomId), { playerCount: count, updatedAt: serverTimestamp() });
+  };
+
+  /** Удалить комнаты-кандидаты, чей `players` фактически пуст (см. roomSweep). */
+  const sweep = (ids: string[]): void => {
+    for (const roomId of ids) {
+      void get(ref(db, `rooms/${roomId}/players`))
+        .then(async (snap) => {
+          if (snap.exists()) return;
+          await remove(ref(db, `rooms/${roomId}`));
+          await remove(indexRef(roomId));
+        })
+        .catch(() => {
+          // Гонка с другим уборщиком/живой комнатой — безопасно игнорируем.
+        });
+    }
+  };
+
   return {
     uid,
+    kind: 'firebase',
 
     listRooms(callback) {
-      return onValue(ref(db, 'roomsIndex'), (snap) => callback(normalizeRoomList(snap.val())));
+      return onValue(ref(db, 'roomsIndex'), (snap) => {
+        const rooms = normalizeRoomList(snap.val());
+        callback(rooms);
+        const now = Date.now();
+        if (now - lastSweepAt >= SWEEP_MIN_INTERVAL_MS) {
+          lastSweepAt = now;
+          sweep(sweepCandidates(rooms, now));
+        }
+      });
     },
 
     subscribeRoom(roomId, callback) {
@@ -73,39 +123,44 @@ export async function createFirebasePort(): Promise<NetworkPort> {
     async createRoom(roomName, playerName) {
       const roomId = randomId('room');
       const name = clampName(roomName, 'Комната');
-      await set(metaRef(roomId), {
-        roomId,
-        name,
-        hostId: uid,
-        status: 'lobby',
-        arenaSeed: 0,
-        maxPlayers: MAX_PLAYERS,
-        createdAt: serverTimestamp(),
-        countdownEndsAt: null,
-        winnerId: null,
+      // Один атомарный multi-path: комната появляется сразу с host-игроком и
+      // записью в индексе — либо целиком, либо никак (нет «невидимых» комнат).
+      await update(ref(db), {
+        [`rooms/${roomId}/meta`]: {
+          roomId,
+          name,
+          hostId: uid,
+          status: 'lobby',
+          arenaSeed: 0,
+          maxPlayers: MAX_PLAYERS,
+          createdAt: serverTimestamp(),
+          countdownEndsAt: null,
+          winnerId: null,
+        },
+        [`rooms/${roomId}/players/${uid}`]: {
+          name: clampName(playerName, 'Пилот'),
+          colorIndex: 0,
+          ready: false,
+          joinedAt: serverTimestamp(),
+          presence: true,
+        },
+        [`roomsIndex/${roomId}`]: {
+          name,
+          status: 'lobby',
+          playerCount: 1,
+          maxPlayers: MAX_PLAYERS,
+          hostId: uid,
+          updatedAt: serverTimestamp(),
+        },
       });
       await armPresence(roomId);
-      await set(playerRef(roomId), {
-        name: clampName(playerName, 'Пилот'),
-        colorIndex: 0,
-        ready: false,
-        joinedAt: serverTimestamp(),
-        presence: true,
-      });
-      await set(indexRef(roomId), {
-        name,
-        status: 'lobby',
-        playerCount: 1,
-        maxPlayers: MAX_PLAYERS,
-        hostId: uid,
-        updatedAt: serverTimestamp(),
-      });
       return roomId;
     },
 
     async joinRoom(roomId, playerName) {
       const room = await readRoom(roomId);
       if (!room) throw new Error('Комната не найдена');
+      if (room.meta.status !== 'lobby') throw new Error('Бой уже идёт или завершён');
       if (Object.keys(room.players).length >= MAX_PLAYERS) throw new Error('Комната заполнена');
       const colorIndex = nextColorIndex(room.players);
       await armPresence(roomId);
@@ -116,10 +171,7 @@ export async function createFirebasePort(): Promise<NetworkPort> {
         joinedAt: serverTimestamp(),
         presence: true,
       });
-      await update(indexRef(roomId), {
-        playerCount: Object.keys(room.players).length + 1,
-        updatedAt: serverTimestamp(),
-      });
+      await reconcileIndex(roomId);
     },
 
     async setReady(roomId, ready) {
@@ -129,13 +181,16 @@ export async function createFirebasePort(): Promise<NetworkPort> {
     async startMatch(roomId) {
       const room = await readRoom(roomId);
       if (!room || room.meta.hostId !== uid) return;
-      await update(metaRef(roomId), {
-        status: 'active',
-        arenaSeed: Math.floor(Math.random() * 0xffffffff) >>> 0,
-        corners: assignStartCorners(room.players),
-        countdownEndsAt: Date.now() + COUNTDOWN_MS,
+      // Статусы meta и индекса меняются атомарно — иначе обрыв между записями
+      // оставлял комнату «lobby» в списке при уже идущем бое.
+      await update(ref(db), {
+        [`rooms/${roomId}/meta/status`]: 'active',
+        [`rooms/${roomId}/meta/arenaSeed`]: Math.floor(Math.random() * 0xffffffff) >>> 0,
+        [`rooms/${roomId}/meta/corners`]: assignStartCorners(room.players),
+        [`rooms/${roomId}/meta/countdownEndsAt`]: Date.now() + COUNTDOWN_MS,
+        [`roomsIndex/${roomId}/status`]: 'active',
+        [`roomsIndex/${roomId}/updatedAt`]: serverTimestamp(),
       });
-      await update(indexRef(roomId), { status: 'active', updatedAt: serverTimestamp() });
     },
 
     publishState(roomId, state) {
@@ -158,14 +213,15 @@ export async function createFirebasePort(): Promise<NetworkPort> {
     async rematch(roomId) {
       const room = await readRoom(roomId);
       if (!room || room.meta.hostId !== uid) return;
-      await update(metaRef(roomId), {
-        status: 'lobby',
-        winnerId: null,
-        arenaSeed: 0,
-        corners: {},
-        countdownEndsAt: null,
+      await update(ref(db), {
+        [`rooms/${roomId}/meta/status`]: 'lobby',
+        [`rooms/${roomId}/meta/winnerId`]: null,
+        [`rooms/${roomId}/meta/arenaSeed`]: 0,
+        [`rooms/${roomId}/meta/corners`]: null,
+        [`rooms/${roomId}/meta/countdownEndsAt`]: null,
+        [`roomsIndex/${roomId}/status`]: 'lobby',
+        [`roomsIndex/${roomId}/updatedAt`]: serverTimestamp(),
       });
-      await update(indexRef(roomId), { status: 'lobby', updatedAt: serverTimestamp() });
     },
 
     async leaveRoom(roomId) {
@@ -176,15 +232,12 @@ export async function createFirebasePort(): Promise<NetworkPort> {
       }
       await onDisconnect(playerRef(roomId)).cancel();
       await onDisconnect(stateRef(roomId)).cancel();
-      await remove(playerRef(roomId));
-      await remove(stateRef(roomId));
-      const remaining = room ? Object.keys(room.players).length - 1 : 0;
-      if (remaining <= 0) {
-        await remove(ref(db, `rooms/${roomId}`));
-        await remove(indexRef(roomId));
-      } else {
-        await update(indexRef(roomId), { playerCount: remaining, updatedAt: serverTimestamp() });
-      }
+      // Свой player+state удаляются одним атомарным multi-path update.
+      await update(ref(db), {
+        [`rooms/${roomId}/players/${uid}`]: null,
+        [`rooms/${roomId}/states/${uid}`]: null,
+      });
+      await reconcileIndex(roomId);
     },
 
     async ensureHost(roomId) {

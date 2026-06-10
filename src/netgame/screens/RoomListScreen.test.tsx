@@ -37,6 +37,7 @@ const sampleRoom = {
   playerCount: 1,
   maxPlayers: 4,
   hostId: 'host',
+  updatedAt: 0,
 };
 
 describe('RoomListScreen — гейтинг по готовности порта', () => {

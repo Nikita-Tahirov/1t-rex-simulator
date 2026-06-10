@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { resolveAdapterKind } from '../net/firebaseConfig.ts';
 import type { RoomListItem } from '../net/types.ts';
 import { useNetSessionContext } from '../session/netSessionContext.ts';
 import { useAppModeStore } from '../store/appModeStore.ts';
+import { useNetRoomStore } from '../store/netRoomStore.ts';
 import { NET_STRINGS } from '../strings.ts';
 import { INPUT_CLASS, NameField, NetScreenShell } from './shared.tsx';
 
@@ -10,17 +12,51 @@ export function RoomListScreen() {
   const { uid, rooms, error, createRoom, joinRoom } = useNetSessionContext();
   const setNetScreen = useAppModeStore((s) => s.setNetScreen);
   const exitNet = useAppModeStore((s) => s.exitNet);
+  const adapterKind = useNetRoomStore((s) => s.adapterKind);
   const [newRoomName, setNewRoomName] = useState('');
+  // Гард повторного клика: createRoom/joinRoom асинхронны (firebase ждёт
+  // round-trip), и дабл-клик без гарда создавал две одинаковые комнаты.
+  const [pending, setPending] = useState(false);
   // Порт инициализируется асинхронно (firebase: signInAnonymously — сетевой
   // round-trip). До готовности uid=null, а createRoom/joinRoom — no-op. Гейтим
   // кнопки, чтобы клик не «проваливался» молча.
   const connecting = !uid;
+  // memory вместо ожидавшегося firebase = тихая деградация (блокировщик/оффлайн):
+  // комнаты НЕ видны другим устройствам — обязаны предупредить.
+  const degraded = adapterKind === 'memory' && resolveAdapterKind() === 'firebase';
+
+  const submitCreate = async () => {
+    if (pending || connecting) return;
+    setPending(true);
+    try {
+      await createRoom(newRoomName);
+      setNewRoomName('');
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const submitJoin = async (roomId: string) => {
+    if (pending || connecting) return;
+    setPending(true);
+    try {
+      await joinRoom(roomId);
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <NetScreenShell title={NET_STRINGS.roomsTitle}>
       <NameField />
 
-      <div className="mb-4 flex gap-2">
+      <form
+        className="mb-4 flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submitCreate();
+        }}
+      >
         <input
           type="text"
           value={newRoomName}
@@ -31,17 +67,22 @@ export function RoomListScreen() {
           className={INPUT_CLASS}
         />
         <button
-          type="button"
-          disabled={connecting}
+          type="submit"
+          disabled={connecting || pending}
           className="sim-control sim-control--primary whitespace-nowrap px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
-          onClick={() => createRoom(newRoomName)}
         >
           {NET_STRINGS.roomsCreate}
         </button>
-      </div>
+      </form>
 
       {connecting && (
         <p className="mb-3 text-sm text-[var(--color-text-dim)]">{NET_STRINGS.roomConnecting}</p>
+      )}
+      {!connecting && degraded && (
+        <p className="mb-3 text-sm text-[var(--color-danger)]">{NET_STRINGS.netDegraded}</p>
+      )}
+      {!connecting && !degraded && adapterKind === 'memory' && (
+        <p className="mb-3 text-xs text-[var(--color-text-dim)]">{NET_STRINGS.netLocalMode}</p>
       )}
       {error && <p className="mb-3 text-sm text-[var(--color-danger)]">{error}</p>}
 
@@ -55,8 +96,8 @@ export function RoomListScreen() {
           <RoomRow
             key={room.roomId}
             room={room}
-            connecting={connecting}
-            onJoin={() => joinRoom(room.roomId)}
+            connecting={connecting || pending}
+            onJoin={() => void submitJoin(room.roomId)}
           />
         ))}
       </ul>

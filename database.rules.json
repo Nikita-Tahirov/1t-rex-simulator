@@ -23,6 +23,7 @@
     "rooms": {
       ".read": "auth != null",
       "$roomId": {
+        ".write": "auth != null && !newData.exists() && (!data.child('players').exists() || data.child('players').child(auth.uid).exists())",
         "meta": {
           ".write": "auth != null && (!data.exists() || data.child('hostId').val() === auth.uid || !root.child('rooms').child($roomId).child('players').child(data.child('hostId').val()).exists())",
           ".validate": "newData.hasChildren(['hostId','status','maxPlayers'])",
