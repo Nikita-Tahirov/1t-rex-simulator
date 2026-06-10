@@ -25,12 +25,14 @@ interface Props {
   colorIndex: number;
   /** Геттер оборотов спиннера (об/мин). Стабильная ссылка → без ре-рендеров. */
   getSpinnerRpm?: () => number;
+  /** Опустить визуальный ротор (когда ротор — отдельное физ-тело у dynamic-робота). */
+  omitRotor?: boolean;
   /** Визуальное состояние урона (только для локального робота — огонь/искры). */
   damageVisual?: RobotDamageVisualState;
 }
 
 export const BattleRobotVisual = forwardRef<Group, Props>(function BattleRobotVisual(
-  { colorIndex, getSpinnerRpm, damageVisual },
+  { colorIndex, getSpinnerRpm, omitRotor, damageVisual },
   ref,
 ) {
   const spinRef = useRef<Group>(null);
@@ -56,13 +58,15 @@ export const BattleRobotVisual = forwardRef<Group, Props>(function BattleRobotVi
           </Suspense>
         </group>
       ))}
-      <group position={[ROBOT.spinnerOffsetX, ROBOT.spinnerOffsetY, 0]}>
-        <group ref={spinRef}>
-          <Suspense fallback={null}>
-            <RobotSpinnerModel spinnerColor={color.accent} />
-          </Suspense>
+      {!omitRotor && (
+        <group position={[ROBOT.spinnerOffsetX, ROBOT.spinnerOffsetY, 0]}>
+          <group ref={spinRef}>
+            <Suspense fallback={null}>
+              <RobotSpinnerModel spinnerColor={color.accent} />
+            </Suspense>
+          </group>
         </group>
-      </group>
+      )}
       {damageVisual && (
         <RobotDamageEffects
           health={damageVisual.health}

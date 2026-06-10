@@ -7,6 +7,10 @@
  * detect-gpu базы), а дальше DPR подстраивает `PerformanceMonitor` по реальному FPS.
  */
 
+import type { BattlePhysicsTier } from '@/physics/battle/battleRobotTypes.ts';
+
+export type { BattlePhysicsTier };
+
 export interface BattleQuality {
   /** Включить shadow map (самая дорогая статья на слабых GPU). */
   shadows: boolean;
@@ -15,6 +19,10 @@ export interface BattleQuality {
   /** Верхняя граница DPR (нижнюю подбирает PerformanceMonitor). */
   maxDpr: number;
   antialias: boolean;
+  /** Уровень физики: `full` — динамические Rapier-тела; `lite` — кинематика. */
+  physicsTier: BattlePhysicsTier;
+  /** Шаг физики, с (мобильные/слабые — 1/30 ради CPU). */
+  physicsTimeStep: number;
 }
 
 export interface DeviceHint {
@@ -31,13 +39,31 @@ export function detectDevice(): DeviceHint {
   };
 }
 
-/** Стартовое качество боя по устройству. Мобильные/малоядерные — без теней. */
+/**
+ * Стартовое качество боя по устройству. Мобильные/малоядерные — без теней,
+ * физика на 1/30. Уровень физики `full` (динамика) по умолчанию даже на слабых
+ * (нужен реализм); `PerformanceMonitor` понизит до `lite` при стойкой просадке.
+ */
 export function initialBattleQuality(device: DeviceHint): BattleQuality {
   const lowEnd = device.mobile || device.cores <= 4;
   if (lowEnd) {
-    return { shadows: false, shadowMapSize: 1024, maxDpr: 1, antialias: false };
+    return {
+      shadows: false,
+      shadowMapSize: 1024,
+      maxDpr: 1,
+      antialias: false,
+      physicsTier: 'full',
+      physicsTimeStep: 1 / 30,
+    };
   }
-  return { shadows: true, shadowMapSize: 1024, maxDpr: 1.25, antialias: true };
+  return {
+    shadows: true,
+    shadowMapSize: 1024,
+    maxDpr: 1.25,
+    antialias: true,
+    physicsTier: 'full',
+    physicsTimeStep: 1 / 60,
+  };
 }
 
 /** Нижняя граница DPR при сильной просадке FPS. */
