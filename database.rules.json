@@ -54,8 +54,15 @@
             ".validate": "newData.hasChildren(['x','z','yaw','health','alive','seq','t'])",
             "x": { ".validate": "newData.isNumber()" },
             "z": { ".validate": "newData.isNumber()" },
+            "y": { ".validate": "newData.isNumber()" },
             "yaw": { ".validate": "newData.isNumber()" },
+            "qx": { ".validate": "newData.isNumber()" },
+            "qy": { ".validate": "newData.isNumber()" },
+            "qz": { ".validate": "newData.isNumber()" },
+            "qw": { ".validate": "newData.isNumber()" },
             "speed": { ".validate": "newData.isNumber()" },
+            "vx": { ".validate": "newData.isNumber()" },
+            "vz": { ".validate": "newData.isNumber()" },
             "spinnerRpm": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "health": {
               ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"

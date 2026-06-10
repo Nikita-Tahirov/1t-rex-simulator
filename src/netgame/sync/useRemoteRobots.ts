@@ -1,6 +1,10 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
-import { setBattlePose } from '@/physics/battle/battleRobotRegistry.ts';
+import {
+  type BattlePose,
+  makeBattlePose,
+  setBattlePose,
+} from '@/physics/battle/battleRobotRegistry.ts';
 import { EXTRAPOLATE_MAX_MS, INTERP_DELAY_MS } from '../battle/battleConfig.ts';
 import { useNetRoomStore } from '../store/netRoomStore.ts';
 import { pushSnapshot, type SampledPose, type Snapshot, sampleSnapshots } from './interpolation.ts';
@@ -8,26 +12,19 @@ import { pushSnapshot, type SampledPose, type Snapshot, sampleSnapshots } from '
 /**
  * Интерполяция удалённых роботов: каждый кадр читает свежие `states` из стора,
  * копит снимки по uid и пишет интерполированную (на `INTERP_DELAY_MS` в прошлом)
- * позу в общий реестр `battleRobotRegistry`. Оттуда её берут визуальные
- * `RemoteBattleRobot`. Вызывается внутри `<Canvas>` (нужен `useFrame`).
+ * ПОЛНУЮ позу (с высотой/ориентацией/скоростями) в общий реестр. Оттуда её берёт
+ * удалённое динамическое тело (`RemoteDynamicRobot`) для следования. Вызывается
+ * внутри `<Canvas>` (нужен `useFrame`).
  *
  * Время буфера — ЛОКАЛЬНОЕ (`performance.now()` на приёме), а не таймстемп
- * отправителя: часы клиентов не синхронизированы, и сравнение чужого `Date.now()`
- * со своим ломало интерполяцию (главный источник рассинхрона). При пропуске
- * пакетов поза коротко экстраполируется (`EXTRAPOLATE_MAX_MS`), затем замирает.
+ * отправителя: часы клиентов не синхронизированы. При пропуске пакетов поза
+ * коротко экстраполируется (`EXTRAPOLATE_MAX_MS`) по `vx,vz`, затем замирает.
  */
 export function useRemoteRobots(localUid: string): void {
   const buffers = useRef(new Map<string, Snapshot[]>());
   const lastSeq = useRef(new Map<string, number>());
-  const scratch = useRef<SampledPose>({
-    x: 0,
-    z: 0,
-    yaw: 0,
-    speed: 0,
-    spinnerRpm: 0,
-    health: 0,
-    alive: false,
-  });
+  const sampled = useRef<SampledPose>(makeSampledPose());
+  const poseScratch = useRef<BattlePose>(makeBattlePose());
 
   useFrame(() => {
     const room = useNetRoomStore.getState().room;
@@ -48,18 +45,58 @@ export function useRemoteRobots(localUid: string): void {
         pushSnapshot(buffer, {
           t: now,
           x: state.x,
+          y: state.y,
           z: state.z,
           yaw: state.yaw,
+          qx: state.qx,
+          qy: state.qy,
+          qz: state.qz,
+          qw: state.qw,
           speed: state.speed,
+          vx: state.vx,
+          vz: state.vz,
           spinnerRpm: state.spinnerRpm,
           health: state.health,
           alive: state.alive,
         });
       }
-      if (sampleSnapshots(buffer, renderTime, scratch.current, EXTRAPOLATE_MAX_MS)) {
-        const pose = scratch.current;
-        setBattlePose(uid, pose.x, pose.z, pose.yaw, pose.speed, pose.spinnerRpm, pose.alive);
+      if (sampleSnapshots(buffer, renderTime, sampled.current, EXTRAPOLATE_MAX_MS)) {
+        const s = sampled.current;
+        const p = poseScratch.current;
+        p.x = s.x;
+        p.y = s.y;
+        p.z = s.z;
+        p.yaw = s.yaw;
+        p.qx = s.qx;
+        p.qy = s.qy;
+        p.qz = s.qz;
+        p.qw = s.qw;
+        p.speed = s.speed;
+        p.vx = s.vx;
+        p.vz = s.vz;
+        p.spinnerRpm = s.spinnerRpm;
+        p.alive = s.alive;
+        setBattlePose(uid, p);
       }
     }
   });
+}
+
+function makeSampledPose(): SampledPose {
+  return {
+    x: 0,
+    y: 0,
+    z: 0,
+    yaw: 0,
+    qx: 0,
+    qy: 0,
+    qz: 0,
+    qw: 1,
+    speed: 0,
+    vx: 0,
+    vz: 0,
+    spinnerRpm: 0,
+    health: 0,
+    alive: false,
+  };
 }

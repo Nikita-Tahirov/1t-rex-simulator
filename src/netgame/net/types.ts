@@ -65,10 +65,20 @@ export interface RoomMeta {
 export interface PlayerState {
   x: number;
   z: number;
-  /** Рыскание, рад. */
+  /** Высота центра шасси, м — для подброса/опрокидывания. */
+  y: number;
+  /** Рыскание, рад (для 2D-логики и kinematic-визуала). */
   yaw: number;
+  /** Полная ориентация тела (кватернион) — для синхронного опрокидывания/наклона. */
+  qx: number;
+  qy: number;
+  qz: number;
+  qw: number;
   /** Линейная скорость, м/с (для интерполяции/эффектов). */
   speed: number;
+  /** Компоненты линейной скорости, м/с — для экстраполяции/feedforward. */
+  vx: number;
+  vz: number;
   /** Обороты спиннера, об/мин (для визуала призрака и оружия). */
   spinnerRpm: number;
   /** Здоровье 0..ROBOT_MAX_HEALTH. */

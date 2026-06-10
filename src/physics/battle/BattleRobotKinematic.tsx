@@ -24,11 +24,35 @@ import {
 import {
   type BattlePose,
   battlePoses,
+  makeBattlePose,
   removeBattlePose,
   setBattlePose,
+  yawToQuat,
 } from './battleRobotRegistry.ts';
 import type { BattleRobotConfig, BattleRobotProps } from './battleRobotTypes.ts';
 import { SPAWN_HEIGHT } from './spawnPoints.ts';
+
+/** Заполняет полную позу из 2D-кинематики (высота фикс, наклона нет). */
+function fillKinematicPose(
+  out: BattlePose,
+  x: number,
+  z: number,
+  yaw: number,
+  speed: number,
+  spinnerRpm: number,
+  alive: boolean,
+): void {
+  out.x = x;
+  out.y = SPAWN_HEIGHT;
+  out.z = z;
+  out.yaw = yaw;
+  yawToQuat(yaw, out);
+  out.speed = speed;
+  out.vx = Math.cos(yaw) * speed;
+  out.vz = Math.sin(yaw) * speed;
+  out.spinnerRpm = spinnerRpm;
+  out.alive = alive;
+}
 
 /**
  * Лёгкий КИНЕМАТИЧЕСКИЙ боевой робот (fallback-уровень `lite` адаптивной деградации
@@ -61,6 +85,7 @@ export function LocalKinematicRobot({ config, arenaSize, active }: BattleRobotPr
   const lastSpinAt = useRef(new Map<string, number>());
   const otherPoses = useRef<BattlePose[]>([]);
   const otherUids = useRef<string[]>([]);
+  const poseScratch = useRef<BattlePose>(makeBattlePose());
   const selfPose = useRef<CombatPose>({ x: 0, z: 0, yaw: 0, speed: 0 });
   const { x: spawnX, z: spawnZ, yaw: spawnYaw } = config.spawn;
 
@@ -77,7 +102,7 @@ export function LocalKinematicRobot({ config, arenaSize, active }: BattleRobotPr
     telemetry.yaw = spawnYaw;
     telemetry.speed = 0;
     telemetry.spinnerRpm = 0;
-    setBattlePose(config.uid, spawnX, spawnZ, spawnYaw, 0, 0, true);
+    setBattlePose(config.uid, makeBattlePose(spawnX, spawnZ, spawnYaw, SPAWN_HEIGHT, true));
     return () => removeBattlePose(config.uid);
   }, [config.uid, spawnX, spawnZ, spawnYaw]);
 
@@ -145,7 +170,8 @@ export function LocalKinematicRobot({ config, arenaSize, active }: BattleRobotPr
     telemetry.yaw = p.yaw;
     telemetry.speed = p.speed;
     telemetry.spinnerRpm = spinnerRpm.current;
-    setBattlePose(config.uid, p.x, p.z, p.yaw, p.speed, spinnerRpm.current, alive);
+    fillKinematicPose(poseScratch.current, p.x, p.z, p.yaw, p.speed, spinnerRpm.current, alive);
+    setBattlePose(config.uid, poseScratch.current);
     applyPoseToGroup(group, p.x, p.z, p.yaw, alive);
   });
 
@@ -164,7 +190,7 @@ export function RemoteKinematicRobot({ config }: { config: BattleRobotConfig }) 
   const { uid, spawn } = config;
 
   useEffect(() => {
-    setBattlePose(uid, spawn.x, spawn.z, spawn.yaw, 0, 0, true);
+    setBattlePose(uid, makeBattlePose(spawn.x, spawn.z, spawn.yaw, SPAWN_HEIGHT, true));
     return () => removeBattlePose(uid);
   }, [uid, spawn.x, spawn.z, spawn.yaw]);
 

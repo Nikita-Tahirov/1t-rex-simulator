@@ -45,6 +45,7 @@ import { computeDriveForces, type DriveParams } from './battleDrive.ts';
 import {
   type BattlePose,
   battlePoses,
+  makeBattlePose,
   removeBattlePose,
   setBattlePose,
 } from './battleRobotRegistry.ts';
@@ -82,6 +83,7 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
   const lastWallAt = useRef(-Infinity);
   const otherPoses = useRef<BattlePose[]>([]);
   const otherUids = useRef<string[]>([]);
+  const poseScratch = useRef<BattlePose>(makeBattlePose());
   const selfCombat = useRef<CombatPose>({ x: 0, z: 0, yaw: 0, speed: 0 });
   const fwd = useRef(new Vector3());
   const right = useRef(new Vector3());
@@ -111,7 +113,7 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
     telemetry.yaw = spawn.yaw;
     telemetry.speed = 0;
     telemetry.spinnerRpm = 0;
-    setBattlePose(uid, spawn.x, spawn.z, spawn.yaw, 0, 0, true);
+    setBattlePose(uid, makeBattlePose(spawn.x, spawn.z, spawn.yaw, SPAWN_HEIGHT, true));
     return () => removeBattlePose(uid);
   }, [uid, spawn.x, spawn.z, spawn.yaw]);
 
@@ -208,7 +210,23 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
     telemetry.yaw = yaw;
     telemetry.speed = forwardSpeed;
     telemetry.spinnerRpm = spinnerRpm.current;
-    setBattlePose(uid, pos.x, pos.z, yaw, forwardSpeed, spinnerRpm.current, alive);
+
+    // Полная поза тела в реестр (для публикации и удалённого следования соперников).
+    const p = poseScratch.current;
+    p.x = pos.x;
+    p.y = pos.y;
+    p.z = pos.z;
+    p.yaw = yaw;
+    p.qx = rot.x;
+    p.qy = rot.y;
+    p.qz = rot.z;
+    p.qw = rot.w;
+    p.speed = forwardSpeed;
+    p.vx = lin.x;
+    p.vz = lin.z;
+    p.spinnerRpm = spinnerRpm.current;
+    p.alive = alive;
+    setBattlePose(uid, p);
   });
 
   return (

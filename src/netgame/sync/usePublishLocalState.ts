@@ -1,25 +1,28 @@
 import { useEffect, useRef } from 'react';
 import { dealtRecord } from '@/physics/battle/battleCombat.ts';
+import { battlePoses } from '@/physics/battle/battleRobotRegistry.ts';
 import { telemetry } from '@/store/telemetry.ts';
 import { STATE_PUBLISH_HZ } from '../battle/battleConfig.ts';
 import type { PlayerState } from '../net/types.ts';
 import type { NetSession } from '../session/useNetSession.ts';
+import { useNetRoomStore } from '../store/netRoomStore.ts';
 
 /**
- * Публикует боевое состояние локального робота (поза + обороты + здоровье + урон,
- * нанесённый соперникам) в сеть с частотой до `STATE_PUBLISH_HZ`. Источник —
- * `telemetry` + накопитель урона. Через `setInterval` (без setState), поэтому
- * годится вне `<Canvas>`.
+ * Публикует ПОЛНОЕ боевое состояние локального робота (поза 3D + ориентация +
+ * скорости + обороты + здоровье + урон соперникам) в сеть с частотой до
+ * `STATE_PUBLISH_HZ`. Источник позы — реестр `battlePoses` (туда локальный робот
+ * пишет полную позу тела каждый кадр), здоровье — `telemetry`. Через `setInterval`
+ * (без setState), поэтому годится вне `<Canvas>`.
  *
  * Оптимизация для слабого интернета: если поза/здоровье/урон практически не
- * изменились, публикация пропускается до keepalive-интервала — это режет
- * аплоад на простое, не ломая интерполяцию (получатель держит/экстраполирует позу).
+ * изменились, публикация пропускается до keepalive-интервала.
  */
 const KEEPALIVE_MS = 500;
 const POS_EPS = 0.02;
 const YAW_EPS = 0.01;
 const SPEED_EPS = 0.05;
 const RPM_EPS = 50;
+const QUAT_EPS = 0.01;
 
 export function usePublishLocalState(session: NetSession): void {
   const seq = useRef(0);
@@ -29,18 +32,27 @@ export function usePublishLocalState(session: NetSession): void {
   useEffect(() => {
     const intervalMs = Math.round(1000 / STATE_PUBLISH_HZ);
     const timer = setInterval(() => {
+      const uid = useNetRoomStore.getState().uid;
+      const pose = uid ? battlePoses.get(uid) : undefined;
+      if (!pose) return;
       const nowMs = Date.now();
-      const dealt = dealtRecord();
       const next: Omit<PlayerState, 'seq'> = {
-        x: telemetry.positionX,
-        z: telemetry.positionZ,
-        yaw: telemetry.yaw,
-        speed: telemetry.speed,
-        spinnerRpm: telemetry.spinnerRpm,
+        x: pose.x,
+        z: pose.z,
+        y: pose.y,
+        yaw: pose.yaw,
+        qx: pose.qx,
+        qy: pose.qy,
+        qz: pose.qz,
+        qw: pose.qw,
+        speed: pose.speed,
+        vx: pose.vx,
+        vz: pose.vz,
+        spinnerRpm: pose.spinnerRpm,
         health: telemetry.robotHealth,
         alive: telemetry.robotHealth > 0,
         t: nowMs,
-        dealt,
+        dealt: dealtRecord(),
       };
       const prev = last.current;
       if (prev && nowMs - prev.atMs < KEEPALIVE_MS && !meaningfullyChanged(prev.state, next)) {
@@ -59,7 +71,10 @@ function meaningfullyChanged(prev: PlayerState, next: Omit<PlayerState, 'seq'>):
   return (
     Math.abs(prev.x - next.x) > POS_EPS ||
     Math.abs(prev.z - next.z) > POS_EPS ||
+    Math.abs(prev.y - next.y) > POS_EPS ||
     Math.abs(prev.yaw - next.yaw) > YAW_EPS ||
+    Math.abs(prev.qx - next.qx) > QUAT_EPS ||
+    Math.abs(prev.qz - next.qz) > QUAT_EPS ||
     Math.abs(prev.speed - next.speed) > SPEED_EPS ||
     Math.abs(prev.spinnerRpm - next.spinnerRpm) > RPM_EPS ||
     prev.health !== next.health ||
