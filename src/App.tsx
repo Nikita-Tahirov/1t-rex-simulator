@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber';
 import { Physics } from '@react-three/rapier';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { ACESFilmicToneMapping, BasicShadowMap, PCFSoftShadowMap, SRGBColorSpace } from 'three';
 import { FpsCounter } from '@/hud/FpsCounter.tsx';
 import { HudPanel } from '@/hud/HudPanel.tsx';
@@ -37,6 +37,19 @@ function App() {
   const paused = useSimStore((s) => s.paused);
   const currentScenarioId = useScenarioStore((s) => s.currentScenarioId);
   const appMode = useAppModeStore((s) => s.appMode);
+  const leavingSolo = useAppModeStore((s) => s.leavingSolo);
+  const enterNet = useAppModeStore((s) => s.enterNet);
+
+  // Фаза 2 ухода из solo: к моменту этого passive-эффекта замороженный кадр
+  // (`frameloop="never"` ниже, по `leavingSolo`) уже закоммичен и RAF-цикл
+  // одиночной сцены остановлен. Следующим кадром размонтируем `<Physics>` —
+  // тогда ни один useFrame не выполняется и освобождение Rapier-мира не гонится
+  // с ними (иначе пачка «null pointer passed to rust» в консоли).
+  useEffect(() => {
+    if (!leavingSolo) return;
+    const id = requestAnimationFrame(() => enterNet());
+    return () => cancelAnimationFrame(id);
+  }, [leavingSolo, enterNet]);
 
   // В сетевом режиме одиночная сцена размонтируется, а на её место встаёт
   // ленивый сетевой оверлей. Solo-ветка ниже остаётся неизменной.
@@ -56,6 +69,10 @@ function App() {
   return (
     <div className="relative h-full w-full">
       <Canvas
+        // frameloop="never" в кадре заморозки перед уходом в сеть: останавливает
+        // RAF/useFrame, чтобы unmount `<Physics>` не гонился с шагом Rapier.
+        // В обычной одиночке leavingSolo=false → 'always' (поведение неизменно).
+        frameloop={leavingSolo ? 'never' : 'always'}
         shadows={{ type: shadowMapType }}
         // dpr=[1, 1.25] — небольшой headroom между мобильными и desktop. На 1080p
         // визуальная разница между 1.25 и window.devicePixelRatio (1.5–2.0)
