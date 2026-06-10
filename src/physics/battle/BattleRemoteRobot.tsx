@@ -44,6 +44,8 @@ export function RemoteDynamicRobot({ config }: { config: BattleRobotConfig }) {
   const qCur = useRef(new Quaternion());
   const qTar = useRef(new Quaternion());
   const axis = useRef(new Vector3());
+  const impulse = useRef({ x: 0, y: 0, z: 0 });
+  const torque = useRef({ x: 0, y: 0, z: 0 });
   const { uid, spawn, colorIndex } = config;
   const spawnQuatValue = useMemo(() => yawQuat(spawn.yaw), [spawn.yaw]);
   const getSpinnerRpm = useCallback(() => battlePoses.get(uid)?.spinnerRpm ?? 0, [uid]);
@@ -58,6 +60,10 @@ export function RemoteDynamicRobot({ config }: { config: BattleRobotConfig }) {
     if (!body) return;
     const pose = battlePoses.get(uid);
     if (!pose) return;
+    // Мёртвый соперник «обмякает»: пружину/момент следования не применяем — тело
+    // под гравитацией оседает (паритет с локальным мёртвым динамическим роботом и
+    // тонущим кинематическим призраком). Коллайдер остаётся, его ещё можно толкнуть.
+    if (!pose.alive) return;
     const dtc = Math.min(dt, MAX_DT);
 
     // Пружина к сетевой позе по XYZ (ограниченная сила → таран соперника проходит,
@@ -67,7 +73,11 @@ export function RemoteDynamicRobot({ config }: { config: BattleRobotConfig }) {
     const fx = followForce(pose.x - pos.x, vel.x);
     const fy = followForce(pose.y - pos.y, vel.y);
     const fz = followForce(pose.z - pos.z, vel.z);
-    body.applyImpulse({ x: fx * dtc, y: fy * dtc, z: fz * dtc }, true);
+    const imp = impulse.current;
+    imp.x = fx * dtc;
+    imp.y = fy * dtc;
+    imp.z = fz * dtc;
+    body.applyImpulse(imp, true);
 
     // Полная ориентация — к сетевому кватerниону (синхронизирует наклон/опрокидывание):
     // относительный поворот qErr = qTar · qCur⁻¹ → ось-угол → целевая угловая скорость.
@@ -94,7 +104,11 @@ export function RemoteDynamicRobot({ config }: { config: BattleRobotConfig }) {
       axis.current.z * angle * k - (av.z * REMOTE_YAW_INERTIA) / FOLLOW_TAU,
       FOLLOW_TORQUE_MAX,
     );
-    body.applyTorqueImpulse({ x: tx * dtc, y: ty * dtc, z: tz * dtc }, true);
+    const tq = torque.current;
+    tq.x = tx * dtc;
+    tq.y = ty * dtc;
+    tq.z = tz * dtc;
+    body.applyTorqueImpulse(tq, true);
   });
 
   return (

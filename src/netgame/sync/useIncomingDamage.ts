@@ -21,8 +21,10 @@ export function useIncomingDamage(localUid: string): void {
     const room = useNetRoomStore.getState().room;
     if (!room) return;
     let total = 0;
-    for (const [attacker, state] of Object.entries(room.states)) {
-      if (attacker === localUid) continue;
+    // for...in без Object.entries — нет per-frame аллокации массива/пар (hot-path).
+    for (const attacker in room.states) {
+      const state = room.states[attacker];
+      if (!state || attacker === localUid) continue;
       const observed = state.dealt[localUid] ?? 0;
       const { delta, next } = incomingDelta(observed, applied.current.get(attacker));
       applied.current.set(attacker, next);

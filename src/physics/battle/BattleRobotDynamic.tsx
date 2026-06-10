@@ -96,6 +96,8 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
   const fwd = useRef(new Vector3());
   const right = useRef(new Vector3());
   const quat = useRef(new Quaternion());
+  const impulse = useRef({ x: 0, y: 0, z: 0 });
+  const torque = useRef({ x: 0, y: 0, z: 0 });
   const { uid, spawn, colorIndex } = config;
   const color = PLAYER_COLORS[colorIndex % PLAYER_COLORS.length]!;
 
@@ -184,15 +186,16 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
         { throttle, turn, brake: k.brake ? 1 : 0 },
         { ...DRIVE_PARAMS, driveScale },
       );
-      chassis.applyImpulse(
-        {
-          x: (fwd.current.x * out.forwardForce + right.current.x * out.lateralForce) * dtc,
-          y: 0,
-          z: (fwd.current.z * out.forwardForce + right.current.z * out.lateralForce) * dtc,
-        },
-        true,
-      );
-      chassis.applyTorqueImpulse({ x: 0, y: -out.yawTorque * dtc, z: 0 }, true);
+      const imp = impulse.current;
+      imp.x = (fwd.current.x * out.forwardForce + right.current.x * out.lateralForce) * dtc;
+      imp.y = 0;
+      imp.z = (fwd.current.z * out.forwardForce + right.current.z * out.lateralForce) * dtc;
+      chassis.applyImpulse(imp, true);
+      const tq = torque.current;
+      tq.x = 0;
+      tq.y = -out.yawTorque * dtc;
+      tq.z = 0;
+      chassis.applyTorqueImpulse(tq, true);
     } else {
       spinnerRpm.current = decaySpinnerRpm(spinnerRpm.current, dtc);
     }

@@ -32,8 +32,10 @@ export function useRemoteRobots(localUid: string): void {
     const now = performance.now();
     const renderTime = now - INTERP_DELAY_MS;
 
-    for (const [uid, state] of Object.entries(room.states)) {
-      if (uid === localUid) continue;
+    // for...in без Object.entries — нет per-frame аллокации массива/пар (hot-path).
+    for (const uid in room.states) {
+      const state = room.states[uid];
+      if (!state || uid === localUid) continue;
       let buffer = buffers.current.get(uid);
       if (!buffer) {
         buffer = [];
