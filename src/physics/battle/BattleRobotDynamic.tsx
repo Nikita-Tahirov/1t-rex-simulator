@@ -73,6 +73,13 @@ const DRIVE_PARAMS: DriveParams = {
   driveScale: 1,
 };
 
+// Лёгкий authority-bias по min(uid): при клинче робот с БО́ЛЬШИМ uid уступает
+// (снижает тягу), чтобы оба экрана сходились на версии меньшего uid —
+// детерминированный тай-брейк без доп. сети. Полный pair-authority-transfer не
+// делаем: расхождения на сильных ударах приняты планом, а трафик RTDB ограничен.
+const CLASH_YIELD_MS = 130;
+const CLASH_YIELD_FACTOR = 0.35;
+
 export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
   const chassisRef = useRef<RapierRigidBody>(null!);
   const keys = useKeyboard();
@@ -81,6 +88,7 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
   const lastRamAt = useRef(new Map<string, number>());
   const lastSpinAt = useRef(new Map<string, number>());
   const lastWallAt = useRef(-Infinity);
+  const yieldUntil = useRef(0);
   const otherPoses = useRef<BattlePose[]>([]);
   const otherUids = useRef<string[]>([]);
   const poseScratch = useRef<BattlePose>(makeBattlePose());
@@ -119,28 +127,33 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
 
   const getSpinnerRpm = useCallback(() => spinnerRpm.current, []);
 
-  const onContactForce = useCallback((payload: ContactForcePayload) => {
-    const ud = readBattleUserData(payload.other.rigidBodyObject?.userData);
-    const now = performance.now();
-    if (ud.role === 'battle-robot' && ud.uid) {
-      const dmg = ramDamageFromForce(payload.maxForceMagnitude);
-      if (dmg > 0 && passesContactCooldown(lastRamAt.current, ud.uid, now)) {
-        addDealtDamage(ud.uid, dmg);
+  const onContactForce = useCallback(
+    (payload: ContactForcePayload) => {
+      const ud = readBattleUserData(payload.other.rigidBodyObject?.userData);
+      const now = performance.now();
+      if (ud.role === 'battle-robot' && ud.uid) {
+        const dmg = ramDamageFromForce(payload.maxForceMagnitude);
+        if (dmg > 0 && passesContactCooldown(lastRamAt.current, ud.uid, now)) {
+          addDealtDamage(ud.uid, dmg);
+        }
+        // Authority-bias: уступаем сопернику с МЕНЬШИМ uid (он авторитет пары).
+        if (ud.uid < uid) yieldUntil.current = now + CLASH_YIELD_MS;
+        return;
       }
-      return;
-    }
-    if (isDamagingArenaRole(ud.role) && wallImpactExceeds(payload.maxForceMagnitude)) {
-      if (now - lastWallAt.current < ROBOT_IMPACT_DAMAGE_COOLDOWN_MS) return;
-      lastWallAt.current = now;
-      const result = computeImpactDamageDelta({
-        speedMps: Math.abs(telemetry.speed),
-        contactForceN: payload.maxForceMagnitude,
-      });
-      if (result.damage > 0) {
-        applyRobotDamage({ amount: result.damage, source: 'impact', nowMs: now });
+      if (isDamagingArenaRole(ud.role) && wallImpactExceeds(payload.maxForceMagnitude)) {
+        if (now - lastWallAt.current < ROBOT_IMPACT_DAMAGE_COOLDOWN_MS) return;
+        lastWallAt.current = now;
+        const result = computeImpactDamageDelta({
+          speedMps: Math.abs(telemetry.speed),
+          contactForceN: payload.maxForceMagnitude,
+        });
+        if (result.damage > 0) {
+          applyRobotDamage({ amount: result.damage, source: 'impact', nowMs: now });
+        }
       }
-    }
-  }, []);
+    },
+    [uid],
+  );
 
   useFrame((_, dt) => {
     const chassis = chassisRef.current;
@@ -164,10 +177,12 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
       spinnerRpm.current = stepSpinnerRpm(spinnerRpm.current, k.spinnerUp, k.spinnerDown, dtc);
       const throttle = (k.forward ? 1 : 0) - (k.backward ? 1 : 0);
       const turn = (k.right ? 1 : 0) - (k.left ? 1 : 0);
+      const yielding = performance.now() < yieldUntil.current;
+      const driveScale = damage.driveScale * (yielding ? CLASH_YIELD_FACTOR : 1);
       const out = computeDriveForces(
         { forwardSpeed, lateralSpeed, yawRate },
         { throttle, turn, brake: k.brake ? 1 : 0 },
-        { ...DRIVE_PARAMS, driveScale: damage.driveScale },
+        { ...DRIVE_PARAMS, driveScale },
       );
       chassis.applyImpulse(
         {
