@@ -1,10 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import {
-  type ContactForcePayload,
-  CuboidCollider,
-  type RapierRigidBody,
-  RigidBody,
-} from '@react-three/rapier';
+import { type ContactForcePayload, type RapierRigidBody, RigidBody } from '@react-three/rapier';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Quaternion, Vector3 } from 'three';
 import { applyRobotDamage, resetRobotIntegrity } from '@/store/robotIntegrity.ts';
@@ -19,15 +14,10 @@ import {
 } from '../robotDamage.ts';
 import { useKeyboard } from '../useKeyboard.ts';
 import { useRobotDamageModel } from '../useRobotDamageModel.ts';
+import { BattleChassisColliders } from './BattleChassisColliders.tsx';
 import { BattleRobotVisual } from './BattleRobotVisual.tsx';
 import { BattleRotor } from './BattleRotor.tsx';
-import {
-  CHASSIS_COLLIDER_Y,
-  CHASSIS_HALF,
-  CHASSIS_MASS,
-  MAX_DT,
-  yawQuat,
-} from './battleBodyShared.ts';
+import { MAX_DT, yawQuat } from './battleBodyShared.ts';
 import {
   addDealtDamage,
   type CombatPose,
@@ -42,6 +32,7 @@ import {
   wallImpactExceeds,
 } from './battleContactDamage.ts';
 import { computeDriveForces, type DriveParams } from './battleDrive.ts';
+import { drainKnockback, type KnockbackImpulse, resetKnockback } from './battleKnockback.ts';
 import {
   type BattlePose,
   battlePoses,
@@ -57,9 +48,12 @@ import { SPAWN_HEIGHT } from './spawnPoints.ts';
  * ЛОКАЛЬНЫЙ динамический боевой робот (уровень `full`) — настоящее Rapier-тело
  * шасси (масса из ТТХ), ведомое ограниченной тягой/моментом (skid-steer, см.
  * `battleDrive`): инерция, наезды/заклинивание, опрокидывание выпадают из физики.
- * Ротор — отдельное физ-тело ([`BattleRotor`]). Урон сопернику: таран — по РЕАЛЬНОЙ
- * контактной силе (`onContactForce`), спиннер — по проксимити (его диск утоплен в
- * корпус), всё в накопитель `dealt`. Удалённые роботы — в [`BattleRemoteRobot`].
+ * Шасси — коробка + передний клин ([`BattleChassisColliders`]): соперник заезжает
+ * по клину и попадает под диск. Ротор — отдельное физ-тело ([`BattleRotor`]),
+ * реально бьющее заехавшего. Урон сопернику: таран — по контактной силе
+ * (`onContactForce`), спиннер — контакт диска + проксимити-добивка, всё в
+ * накопитель `dealt`. Входящий урон превращается в knockback-отброс
+ * ([`battleKnockback`]). Удалённые роботы — в [`BattleRemoteRobot`].
  */
 
 const DRIVE_PARAMS: DriveParams = {
@@ -98,6 +92,7 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
   const quat = useRef(new Quaternion());
   const impulse = useRef({ x: 0, y: 0, z: 0 });
   const torque = useRef({ x: 0, y: 0, z: 0 });
+  const knockScratch = useRef<KnockbackImpulse>({ x: 0, y: 0, z: 0 });
   const { uid, spawn, colorIndex } = config;
   const color = PLAYER_COLORS[colorIndex % PLAYER_COLORS.length]!;
 
@@ -117,6 +112,7 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
     lastSpinAt.current.clear();
     resetRobotIntegrity();
     resetDealtDamage();
+    resetKnockback();
     telemetry.positionX = spawn.x;
     telemetry.positionZ = spawn.z;
     telemetry.positionY = SPAWN_HEIGHT;
@@ -174,6 +170,13 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
     const forwardSpeed = lin.x * fwd.current.x + lin.z * fwd.current.z;
     const lateralSpeed = lin.x * right.current.x + lin.z * right.current.z;
     const yawRate = -chassis.angvel().y; // yaw_our = −threeY
+
+    // Hit-reaction: входящий сетевой урон (useIncomingDamage) превращается в
+    // физический отброс — удар соперника ощущается и на экране жертвы.
+    // Применяем и к мёртвому телу: добивающий удар отшвыривает корпус.
+    if (drainKnockback(knockScratch.current)) {
+      chassis.applyImpulse(knockScratch.current, true);
+    }
 
     if (active && alive) {
       spinnerRpm.current = stepSpinnerRpm(spinnerRpm.current, k.spinnerUp, k.spinnerDown, dtc);
@@ -261,14 +264,7 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
         ccd
         onContactForce={onContactForce}
       >
-        <CuboidCollider
-          args={[CHASSIS_HALF[0], CHASSIS_HALF[1], CHASSIS_HALF[2]]}
-          position={[0, CHASSIS_COLLIDER_Y, 0]}
-          mass={CHASSIS_MASS}
-          friction={0.25}
-          restitution={0.05}
-          collisionGroups={BATTLE_LOCAL_CHASSIS_GROUPS}
-        />
+        <BattleChassisColliders collisionGroups={BATTLE_LOCAL_CHASSIS_GROUPS} />
         <BattleRobotVisual colorIndex={colorIndex} omitRotor damageVisual={damage.visualState} />
       </RigidBody>
       <BattleRotor
