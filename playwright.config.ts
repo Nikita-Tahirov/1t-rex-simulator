@@ -57,6 +57,10 @@ export default defineConfig({
     url: e2eBaseURL,
     reuseExistingServer: false,
     timeout: 120_000,
+    // E2E всегда детерминированный in-memory транспорт: дефолтный публичный
+    // Firebase-config иначе увёл бы netgame-спеки в реальный prod-RTDB
+    // (недетерминизм + засорение БД). Vite пробрасывает process.env VITE_*.
+    env: { VITE_NET_ADAPTER: 'memory' },
   },
   projects: [
     {

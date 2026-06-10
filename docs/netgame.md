@@ -9,17 +9,19 @@
 UI и синхронизация зависят только от интерфейса [`NetworkPort`](../src/netgame/net/NetworkPort.ts).
 Две реализации:
 
-- **`inMemoryAdapter`** — без бэкенда. Комнаты живут в памяти; вкладки одного
-  браузера синхронизируются через `BroadcastChannel`. Это рабочий мультиплеер
-  «на одной машине» (открыть 2–4 вкладки) — **дефолт**, поэтому продакшен играбелен
-  сразу, и основа для unit/e2e без сети.
 - **`firebaseAdapter`** — Firebase Realtime Database + Anonymous Auth для
-  кросс-девайс игры. Включается, когда заданы `VITE_FIREBASE_*` (см. `.env.example`).
-  Грузится отдельным lazy-чанком `vendor-firebase`.
+  кросс-девайс игры (разные браузеры/устройства видят общий список комнат и
+  бьются друг с другом). **Дефолт**: публичный config проекта `rex-1t` зашит в
+  [`firebaseConfig`](../src/netgame/net/firebaseConfig.ts), поэтому продакшен
+  кросс-девайс играбелен из коробки. Грузится отдельным lazy-чанком `vendor-firebase`.
+- **`inMemoryAdapter`** — без бэкенда. Комнаты живут в памяти; вкладки одного
+  браузера синхронизируются через `BroadcastChannel`. Включается явно
+  `VITE_NET_ADAPTER=memory` — основа для unit/e2e без сети и офлайн-разработки.
+  Также сюда мягко деградирует firebase-путь при сбое инициализации.
 
 Выбор адаптера — [`resolveAdapterKind`](../src/netgame/net/firebaseConfig.ts):
-`VITE_NET_ADAPTER=memory|firebase` или авто (firebase при наличии config, иначе memory).
-При сбое инициализации Firebase — мягкая деградация до in-memory.
+`VITE_NET_ADAPTER=memory|firebase` или авто (config всегда есть → firebase).
+`VITE_FIREBASE_*` нужны только для форка на собственный проект.
 
 ## Модель авторитетности
 
@@ -91,25 +93,30 @@ Presence: in-memory — явный выход + `pagehide`; Firebase — `onDisc
 (адаптер мягко деградирует, если его нет); Firebase SDK — везде. COOP/COEP нужны
 Rapier WASM (заданы в `firebase.json`).
 
-**Кросс-девайс (разные пользователи/устройства) работает ТОЛЬКО через Firebase** —
-требует Console-настройки и `VITE_FIREBASE_*` (см. ниже). Без них доступен
-мультиплеер в нескольких вкладках одного браузера (in-memory).
+**Кросс-девайс (разные пользователи/устройства) работает через Firebase** и
+включён по умолчанию (config проекта `rex-1t` зашит). План Spark (без карты):
+RTDB + Anonymous Auth бесплатны; Firestore не используем (лимит 20K записей/день
+мал для частых поз).
 
-## Включение Firebase (кросс-девайс) — ручные шаги
+## Инфраструктура проекта rex-1t (уже настроено)
 
-Бесплатный план Spark (без карты): RTDB и Anonymous Auth доступны; Firestore не
-используем (лимит 20K записей/день мал для частых поз).
+- **Realtime Database** — инстанс `rex-1t-default-rtdb` в `europe-west1`, ACTIVE.
+- **Anonymous Auth** — включён в Firebase Console (первичная активация на Spark
+  делается только кликом в Console; провайдеры потом — через Admin API).
+- **Web app** — зарегистрирован; публичный config зашит в `firebaseConfig.ts`.
+- **Правила БД** — `database.rules.json` задеплоены в RTDB (REST PUT
+  `/.settings/rules.json`, т.к. `firebase deploy` под запретом dev-настроек).
 
-1. Firebase Console → проект → Build → **Realtime Database** → Create (регион,
-   напр. europe-west1) → start in locked mode.
+## Форк на собственный Firebase-проект
+
+1. Console → Build → **Realtime Database** → Create (регион) → locked mode.
 2. Build → **Authentication** → Sign-in method → включить **Anonymous**.
 3. Project settings → Your apps → **Add app → Web** → скопировать config.
-4. Заполнить `VITE_FIREBASE_*` в `.env` (см. `.env.example`).
-5. Задеплоить правила: `firebase deploy --only database` (или вставить
-   `database.rules.json` в Console → Realtime Database → Rules).
+4. Заполнить `VITE_FIREBASE_*` в `.env` (override дефолта rex-1t).
+5. Задеплоить `database.rules.json` в свой RTDB (Console → Rules или REST).
 
-Без этих шагов приложение использует in-memory адаптер (мультиплеер в нескольких
-вкладках) — это полностью рабочий режим для локального демо/защиты.
+Для офлайн-разработки/e2e — `VITE_NET_ADAPTER=memory` (мультиплеер в нескольких
+вкладках одного браузера, без сети).
 
 ## Тесты
 
