@@ -10,7 +10,7 @@ import { Quaternion, Vector3 } from 'three';
 import { applyRobotDamage, resetRobotIntegrity } from '@/store/robotIntegrity.ts';
 import { telemetry } from '@/store/telemetry.ts';
 import { PLAYER_COLORS } from '@/theme/tokens.ts';
-import { BATTLE_LOCAL_CHASSIS_GROUPS, BATTLE_PROXY_GROUPS } from '../collisionGroups.ts';
+import { BATTLE_LOCAL_CHASSIS_GROUPS } from '../collisionGroups.ts';
 import { ROBOT } from '../constants.ts';
 import {
   computeImpactDamageDelta,
@@ -22,7 +22,16 @@ import { useRobotDamageModel } from '../useRobotDamageModel.ts';
 import { BattleRobotVisual } from './BattleRobotVisual.tsx';
 import { BattleRotor } from './BattleRotor.tsx';
 import {
+  CHASSIS_COLLIDER_Y,
+  CHASSIS_HALF,
+  CHASSIS_MASS,
+  MAX_DT,
+  yawQuat,
+} from './battleBodyShared.ts';
+import {
   addDealtDamage,
+  type CombatPose,
+  dealSpinnerProximityDamage,
   decaySpinnerRpm,
   resetDealtDamage,
   stepSpinnerRpm,
@@ -33,25 +42,24 @@ import {
   wallImpactExceeds,
 } from './battleContactDamage.ts';
 import { computeDriveForces, type DriveParams } from './battleDrive.ts';
-import { battlePoses, removeBattlePose, setBattlePose } from './battleRobotRegistry.ts';
-import type { BattleRobotConfig, BattleRobotProps } from './battleRobotTypes.ts';
+import {
+  type BattlePose,
+  battlePoses,
+  removeBattlePose,
+  setBattlePose,
+} from './battleRobotRegistry.ts';
+import type { BattleRobotProps } from './battleRobotTypes.ts';
 import { readBattleUserData } from './battleUserData.ts';
 import { SPAWN_HEIGHT } from './spawnPoints.ts';
 
 /**
- * ДИНАМИЧЕСКИЙ боевой робот (уровень `full`). Локальный — настоящее Rapier-тело
+ * ЛОКАЛЬНЫЙ динамический боевой робот (уровень `full`) — настоящее Rapier-тело
  * шасси (масса из ТТХ), ведомое ограниченной тягой/моментом (skid-steer, см.
  * `battleDrive`): инерция, наезды/заклинивание, опрокидывание выпадают из физики.
- * Ротор — отдельное физ-тело ([`BattleRotor`]). Урон — по РЕАЛЬНОЙ контактной силе
- * (`battleContactDamage`) в накопитель `dealt`. Удалённые — кинематические прокси:
- * солидные препятствия, в которые локальный упирается, ведомые сетевой позой.
+ * Ротор — отдельное физ-тело ([`BattleRotor`]). Урон сопернику: таран — по РЕАЛЬНОЙ
+ * контактной силе (`onContactForce`), спиннер — по проксимити (его диск утоплен в
+ * корпус), всё в накопитель `dealt`. Удалённые роботы — в [`BattleRemoteRobot`].
  */
-
-// Габариты коллайдера шасси (половинные), чуть ниже центра — низкий ЦМ для устойчивости.
-const CHASSIS_HALF = [ROBOT.chassisLength / 2, 0.16, ROBOT.chassisWidth / 2] as const;
-const CHASSIS_COLLIDER_Y = -0.04;
-const CHASSIS_MASS = ROBOT.chassisMass;
-const MAX_DT = 1 / 30;
 
 const DRIVE_PARAMS: DriveParams = {
   mass: ROBOT.chassisMass + 4 * ROBOT.wheelMass,
@@ -64,20 +72,17 @@ const DRIVE_PARAMS: DriveParams = {
   driveScale: 1,
 };
 
-/** Кватернион поворота тела так, чтобы локальный +X смотрел по «нашему» yaw. */
-function yawQuat(yaw: number): [number, number, number, number] {
-  // Визуальная конвенция: rotation.y = −yaw (см. robotGroundPose) → угол −yaw вокруг Y.
-  const half = -yaw / 2;
-  return [0, Math.sin(half), 0, Math.cos(half)];
-}
-
 export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
   const chassisRef = useRef<RapierRigidBody>(null!);
   const keys = useKeyboard();
   const damage = useRobotDamageModel();
   const spinnerRpm = useRef(0);
   const lastRamAt = useRef(new Map<string, number>());
+  const lastSpinAt = useRef(new Map<string, number>());
   const lastWallAt = useRef(-Infinity);
+  const otherPoses = useRef<BattlePose[]>([]);
+  const otherUids = useRef<string[]>([]);
+  const selfCombat = useRef<CombatPose>({ x: 0, z: 0, yaw: 0, speed: 0 });
   const fwd = useRef(new Vector3());
   const right = useRef(new Vector3());
   const quat = useRef(new Quaternion());
@@ -97,6 +102,7 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
   useEffect(() => {
     spinnerRpm.current = 0;
     lastRamAt.current.clear();
+    lastSpinAt.current.clear();
     resetRobotIntegrity();
     resetDealtDamage();
     telemetry.positionX = spawn.x;
@@ -176,6 +182,26 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
 
     const pos = chassis.translation();
     const yaw = Math.atan2(fwd.current.z, fwd.current.x);
+
+    // Спиннер бьёт соперника по проксимити (его коллайдер утоплен в корпус —
+    // через реальный контакт достаёт редко). Таран — отдельно, через onContactForce.
+    if (active && alive) {
+      collectAliveOthers(uid, otherPoses.current, otherUids.current);
+      const self = selfCombat.current;
+      self.x = pos.x;
+      self.z = pos.z;
+      self.yaw = yaw;
+      self.speed = forwardSpeed;
+      dealSpinnerProximityDamage(
+        self,
+        otherPoses.current,
+        otherUids.current,
+        spinnerRpm.current,
+        performance.now(),
+        lastSpinAt.current,
+      );
+    }
+
     telemetry.positionX = pos.x;
     telemetry.positionY = pos.y;
     telemetry.positionZ = pos.z;
@@ -220,43 +246,14 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
   );
 }
 
-export function RemoteDynamicProxy({ config }: { config: BattleRobotConfig }) {
-  const bodyRef = useRef<RapierRigidBody>(null!);
-  const { uid, spawn, colorIndex } = config;
-  const spawnQuatValue = useMemo(() => yawQuat(spawn.yaw), [spawn.yaw]);
-  const getSpinnerRpm = useCallback(() => battlePoses.get(uid)?.spinnerRpm ?? 0, [uid]);
-
-  useEffect(() => {
-    setBattlePose(uid, spawn.x, spawn.z, spawn.yaw, 0, 0, true);
-    return () => removeBattlePose(uid);
-  }, [uid, spawn.x, spawn.z, spawn.yaw]);
-
-  useFrame(() => {
-    const body = bodyRef.current;
-    if (!body) return;
-    const pose = battlePoses.get(uid);
-    if (!pose) return;
-    const y = pose.alive ? SPAWN_HEIGHT : SPAWN_HEIGHT - 0.04;
-    body.setNextKinematicTranslation({ x: pose.x, y, z: pose.z });
-    const q = yawQuat(pose.yaw);
-    body.setNextKinematicRotation({ x: q[0], y: q[1], z: q[2], w: q[3] });
-  });
-
-  return (
-    <RigidBody
-      ref={bodyRef}
-      colliders={false}
-      type="kinematicPosition"
-      position={[spawn.x, SPAWN_HEIGHT, spawn.z]}
-      quaternion={spawnQuatValue}
-      userData={{ role: 'battle-robot', uid }}
-    >
-      <CuboidCollider
-        args={[CHASSIS_HALF[0], CHASSIS_HALF[1], CHASSIS_HALF[2]]}
-        position={[0, CHASSIS_COLLIDER_Y, 0]}
-        collisionGroups={BATTLE_PROXY_GROUPS}
-      />
-      <BattleRobotVisual colorIndex={colorIndex} getSpinnerRpm={getSpinnerRpm} />
-    </RigidBody>
-  );
+/** Заполняет переиспользуемые массивы поз/uid живых соперников (без аллокаций). */
+function collectAliveOthers(selfUid: string, poses: BattlePose[], uids: string[]): void {
+  poses.length = 0;
+  uids.length = 0;
+  for (const [id, other] of battlePoses) {
+    if (id !== selfUid && other.alive) {
+      poses.push(other);
+      uids.push(id);
+    }
+  }
 }

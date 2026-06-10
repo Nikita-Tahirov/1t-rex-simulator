@@ -1,4 +1,5 @@
-import { LocalDynamicRobot, RemoteDynamicProxy } from './BattleRobotDynamic.tsx';
+import { RemoteDynamicRobot } from './BattleRemoteRobot.tsx';
+import { LocalDynamicRobot } from './BattleRobotDynamic.tsx';
 import { LocalKinematicRobot, RemoteKinematicRobot } from './BattleRobotKinematic.tsx';
 import type { BattlePhysicsTier, BattleRobotProps } from './battleRobotTypes.ts';
 
@@ -24,6 +25,6 @@ export function BattleRobot(props: BattleRobotProps & { physicsTier: BattlePhysi
   return rest.config.isLocal ? (
     <LocalDynamicRobot {...rest} />
   ) : (
-    <RemoteDynamicProxy config={rest.config} />
+    <RemoteDynamicRobot config={rest.config} />
   );
 }

@@ -56,6 +56,8 @@ export const NET_STRINGS = {
   battleAliveCount: (alive: number, total: number) => `Живых: ${alive} из ${total}`,
   battleCountdown: (sec: number) => `Бой начнётся через ${sec}`,
   battleLeave: 'Сдаться и выйти',
+  cameraShoulder: 'Камера: со спины',
+  cameraFollow: 'Камера: следом',
 
   // Результат
   resultVictory: 'Победа!',

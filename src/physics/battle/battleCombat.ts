@@ -173,3 +173,30 @@ export function dealMeleeDamage(
     }
   }
 }
+
+/**
+ * Только СПИННЕРНЫЙ урон по проксимити (для dynamic-пути, где таран идёт через
+ * реальные Rapier-контакты, а коллайдер диска утоплен в корпус и редко достаёт).
+ * Гарантирует, что раскрученный ротор бьёт соперника во фронтальном секторе.
+ */
+export function dealSpinnerProximityDamage(
+  self: CombatPose,
+  poses: readonly Point[],
+  uids: readonly string[],
+  rpm: number,
+  now: number,
+  lastSpinAt: Map<string, number>,
+): void {
+  if (rpm < SPINNER_ACTIVE_RPM) return;
+  for (let i = 0; i < poses.length; i += 1) {
+    const target = poses[i]!;
+    const vid = uids[i]!;
+    const dist = Math.hypot(target.x - self.x, target.z - self.z);
+    if (dist > SPINNER_REACH_M || frontDot(self, target) <= SPINNER_FRONT_DOT) continue;
+    const dmg = spinnerDamage(rpm);
+    if (dmg > 0 && now - (lastSpinAt.get(vid) ?? -Infinity) >= PVP_HIT_COOLDOWN_MS) {
+      addDealtDamage(vid, dmg);
+      lastSpinAt.set(vid, now);
+    }
+  }
+}

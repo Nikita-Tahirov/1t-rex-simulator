@@ -4,6 +4,7 @@ import {
   approachSpeed,
   type CombatPose,
   dealMeleeDamage,
+  dealSpinnerProximityDamage,
   dealtRecord,
   decaySpinnerRpm,
   frontDot,
@@ -142,5 +143,29 @@ describe('dealMeleeDamage (нанесение тарана/спиннера за
     dealMeleeDamage(self, [{ x: 1.2, z: 0 }], ['e'], SPINNER_MAX_RPM, 1000, new Map(), lastSpin);
     dealMeleeDamage(self, [{ x: 1.2, z: 0 }], ['e'], SPINNER_MAX_RPM, 1100, new Map(), lastSpin);
     expect(dealtRecord().e).toBe(Math.round(spinnerDamage(SPINNER_MAX_RPM)));
+  });
+});
+
+describe('dealSpinnerProximityDamage (ротор бьёт по проксимити в dynamic-пути)', () => {
+  it('раскрученный ротор бьёт врага по носу, ниже порога оборотов — нет', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 };
+    dealSpinnerProximityDamage(
+      self,
+      [{ x: 1.2, z: 0 }],
+      ['e'],
+      SPINNER_ACTIVE_RPM - 1,
+      1,
+      new Map(),
+    );
+    expect(dealtRecord()).toEqual({});
+    dealSpinnerProximityDamage(self, [{ x: 1.2, z: 0 }], ['e'], SPINNER_MAX_RPM, 1, new Map());
+    expect(dealtRecord().e).toBe(Math.round(spinnerDamage(SPINNER_MAX_RPM)));
+  });
+
+  it('врага позади или вне досягаемости не бьёт', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 };
+    dealSpinnerProximityDamage(self, [{ x: -1.2, z: 0 }], ['e'], SPINNER_MAX_RPM, 1, new Map());
+    dealSpinnerProximityDamage(self, [{ x: 5, z: 0 }], ['e'], SPINNER_MAX_RPM, 1, new Map());
+    expect(dealtRecord()).toEqual({});
   });
 });
