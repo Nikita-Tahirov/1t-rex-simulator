@@ -63,6 +63,7 @@ export function createInMemoryPort(uid: string, options: Options = {}): NetworkP
 
   return {
     uid,
+    kind: 'memory',
     listRooms: (callback) => inMemoryBackend.subscribeList(callback),
     subscribeRoom: (roomId, callback) => inMemoryBackend.subscribeRoom(roomId, callback),
 
@@ -90,6 +91,9 @@ export function createInMemoryPort(uid: string, options: Options = {}): NetworkP
     async joinRoom(roomId, playerName) {
       const room = inMemoryBackend.getRoom(roomId);
       if (!room) throw new Error('Комната не найдена');
+      // Лобби-гард: список обновляется асинхронно, и клик «Войти» может
+      // прийти после старта боя — пускать в active/finished нельзя.
+      if (room.meta.status !== 'lobby') throw new Error('Бой уже идёт или завершён');
       if (Object.keys(room.players).length >= room.meta.maxPlayers) {
         throw new Error('Комната заполнена');
       }

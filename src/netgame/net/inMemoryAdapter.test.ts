@@ -119,4 +119,17 @@ describe('inMemoryAdapter — поток лобби и боя', () => {
     for (const p of ports) p.dispose();
     extra.dispose();
   });
+
+  it('нельзя войти в комнату с идущим или завершённым боем (лобби-гард)', async () => {
+    const roomId = await host.createRoom('Арена A', 'Хост');
+    await guest.joinRoom(roomId, 'Гость');
+    await host.setReady(roomId, true);
+    await guest.setReady(roomId, true);
+    await host.startMatch(roomId);
+    const late = createInMemoryPort('late-uid');
+    await expect(late.joinRoom(roomId, 'Опоздавший')).rejects.toThrow('уже идёт');
+    await host.finishMatch(roomId, 'host-uid');
+    await expect(late.joinRoom(roomId, 'Опоздавший')).rejects.toThrow('уже идёт');
+    late.dispose();
+  });
 });

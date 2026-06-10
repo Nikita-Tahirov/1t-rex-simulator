@@ -34,6 +34,8 @@ export const NET_STRINGS = {
   roomFull: 'Заполнена',
   roomInProgress: 'Идёт бой',
   roomConnecting: 'Подключение к серверу…',
+  netDegraded: 'Нет связи с сервером — локальный режим: комнаты видны только в этом браузере',
+  netLocalMode: 'Локальный режим: комнаты видны только в этом браузере',
 
   // Лобби
   lobbyTitle: 'Комната',

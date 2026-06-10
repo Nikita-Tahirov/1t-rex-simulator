@@ -91,6 +91,7 @@ class InMemoryBackend {
         playerCount,
         maxPlayers: record.meta.maxPlayers,
         hostId: record.meta.hostId,
+        updatedAt: record.meta.createdAt,
       });
     }
     return items.sort((a, b) => b.roomId.localeCompare(a.roomId));

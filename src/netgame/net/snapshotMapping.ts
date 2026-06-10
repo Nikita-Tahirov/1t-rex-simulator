@@ -123,6 +123,7 @@ export function normalizeRoomList(raw: unknown): RoomListItem[] {
       playerCount: asNumber(room.playerCount, 0),
       maxPlayers: asNumber(room.maxPlayers, MAX_PLAYERS),
       hostId: asString(room.hostId, ''),
+      updatedAt: asNumber(room.updatedAt, 0),
     });
   }
   return items.sort((a, b) => b.roomId.localeCompare(a.roomId));

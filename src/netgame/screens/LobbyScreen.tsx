@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { canStartMatch, isHost, playerList } from '../net/lobby.ts';
 import { useNetSessionContext } from '../session/netSessionContext.ts';
 import { NET_STRINGS } from '../strings.ts';
@@ -5,7 +6,16 @@ import { ColorDot, NetScreenShell } from './shared.tsx';
 
 /** Лобби комнаты: кто подключился, готовность, старт боя у хозяина. */
 export function LobbyScreen() {
-  const { room, uid, ready, setReady, startMatch, leaveRoom } = useNetSessionContext();
+  const { room, uid, ready, setReady, startMatch, leaveRoom, ensureHost } = useNetSessionContext();
+
+  // Хост оборвался (закрыл вкладку/сеть): onDisconnect удалил его player-узел,
+  // но meta.hostId остался — без такеовера лобби неуправляемо (никто не может
+  // нажать «Начать бой»). ensureHost идемпотентен: роль возьмёт старший по
+  // joinedAt из оставшихся; раньше это чинилось только в активном бою.
+  useEffect(() => {
+    if (room && uid && !room.players[room.meta.hostId]) void ensureHost();
+  }, [room, uid, ensureHost]);
+
   if (!room || !uid) {
     return <NetScreenShell title={NET_STRINGS.lobbyTitle}>{NET_STRINGS.connecting}</NetScreenShell>;
   }
