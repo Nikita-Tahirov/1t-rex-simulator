@@ -33,6 +33,7 @@ export const NET_STRINGS = {
   roomPlayers: (count: number, max: number) => `${count}/${max} игроков`,
   roomFull: 'Заполнена',
   roomInProgress: 'Идёт бой',
+  roomConnecting: 'Подключение к серверу…',
 
   // Лобби
   lobbyTitle: 'Комната',

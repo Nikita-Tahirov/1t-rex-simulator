@@ -7,10 +7,14 @@ import { INPUT_CLASS, NameField, NetScreenShell } from './shared.tsx';
 
 /** Список открытых комнат: создать свою или войти в чужую. */
 export function RoomListScreen() {
-  const { rooms, error, createRoom, joinRoom } = useNetSessionContext();
+  const { uid, rooms, error, createRoom, joinRoom } = useNetSessionContext();
   const setNetScreen = useAppModeStore((s) => s.setNetScreen);
   const exitNet = useAppModeStore((s) => s.exitNet);
   const [newRoomName, setNewRoomName] = useState('');
+  // Порт инициализируется асинхронно (firebase: signInAnonymously — сетевой
+  // round-trip). До готовности uid=null, а createRoom/joinRoom — no-op. Гейтим
+  // кнопки, чтобы клик не «проваливался» молча.
+  const connecting = !uid;
 
   return (
     <NetScreenShell title={NET_STRINGS.roomsTitle}>
@@ -28,13 +32,17 @@ export function RoomListScreen() {
         />
         <button
           type="button"
-          className="sim-control sim-control--primary whitespace-nowrap px-4 py-2"
+          disabled={connecting}
+          className="sim-control sim-control--primary whitespace-nowrap px-4 py-2 disabled:cursor-not-allowed disabled:opacity-40"
           onClick={() => createRoom(newRoomName)}
         >
           {NET_STRINGS.roomsCreate}
         </button>
       </div>
 
+      {connecting && (
+        <p className="mb-3 text-sm text-[var(--color-text-dim)]">{NET_STRINGS.roomConnecting}</p>
+      )}
       {error && <p className="mb-3 text-sm text-[var(--color-danger)]">{error}</p>}
 
       <ul className="mb-4 flex max-h-64 flex-col gap-2 overflow-auto">
@@ -44,7 +52,12 @@ export function RoomListScreen() {
           </li>
         )}
         {rooms.map((room) => (
-          <RoomRow key={room.roomId} room={room} onJoin={() => joinRoom(room.roomId)} />
+          <RoomRow
+            key={room.roomId}
+            room={room}
+            connecting={connecting}
+            onJoin={() => joinRoom(room.roomId)}
+          />
         ))}
       </ul>
 
@@ -66,10 +79,18 @@ export function RoomListScreen() {
   );
 }
 
-function RoomRow({ room, onJoin }: { room: RoomListItem; onJoin: () => void }) {
+function RoomRow({
+  room,
+  connecting,
+  onJoin,
+}: {
+  room: RoomListItem;
+  connecting: boolean;
+  onJoin: () => void;
+}) {
   const full = room.playerCount >= room.maxPlayers;
   const inProgress = room.status !== 'lobby';
-  const disabled = full || inProgress;
+  const disabled = full || inProgress || connecting;
   const note = inProgress ? NET_STRINGS.roomInProgress : full ? NET_STRINGS.roomFull : '';
 
   return (
