@@ -11,30 +11,35 @@ import { WHEEL_DEFS } from '../robotDefs.ts';
 import type { RobotDamageVisualState } from '../useRobotDamageModel.ts';
 
 /**
- * Визуальная сборка боевого робота: корпус (цвет игрока) + 4 колеса + крутящийся
- * ротор (accent-цвет игрока). Переиспользует те же GLB-модели, что и одиночка
- * (с per-instance раскраской). Внешний `group` отдаётся через ref — позу им
- * управляет Local/Remote-контроллер. Ротор крутится визуально (оружие активно).
+ * Визуальная сборка боевого робота: корпус (цвет игрока) + 4 колеса + ротор
+ * (accent-цвет игрока), который крутится по ФАКТИЧЕСКИМ оборотам (`getSpinnerRpm`,
+ * управляется R/F у локального и приходит по сети у призрака). Переиспользует те же
+ * GLB-модели, что и одиночка (с per-instance раскраской). Внешний `group` отдаётся
+ * через ref — позу им управляет Local/Remote-контроллер.
  */
 
-const SPINNER_VISUAL_OMEGA = 90;
 const CORPUS_OFFSET_Y = -ROBOT.chassisHeight / 2 - ROBOT.wheelRadius;
+const RPM_TO_RAD_PER_S = (2 * Math.PI) / 60;
 
 interface Props {
   colorIndex: number;
+  /** Геттер оборотов спиннера (об/мин). Стабильная ссылка → без ре-рендеров. */
+  getSpinnerRpm?: () => number;
   /** Визуальное состояние урона (только для локального робота — огонь/искры). */
   damageVisual?: RobotDamageVisualState;
 }
 
 export const BattleRobotVisual = forwardRef<Group, Props>(function BattleRobotVisual(
-  { colorIndex, damageVisual },
+  { colorIndex, getSpinnerRpm, damageVisual },
   ref,
 ) {
   const spinRef = useRef<Group>(null);
   const color = PLAYER_COLORS[colorIndex % PLAYER_COLORS.length]!;
 
   useFrame((_, dt) => {
-    if (spinRef.current) spinRef.current.rotation.z += SPINNER_VISUAL_OMEGA * Math.min(dt, 0.05);
+    if (!spinRef.current) return;
+    const rpm = getSpinnerRpm?.() ?? 0;
+    spinRef.current.rotation.z += rpm * RPM_TO_RAD_PER_S * Math.min(dt, 0.05);
   });
 
   return (

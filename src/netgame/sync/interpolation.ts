@@ -13,6 +13,7 @@ export interface Snapshot {
   z: number;
   yaw: number;
   speed: number;
+  spinnerRpm: number;
   health: number;
   alive: boolean;
 }
@@ -22,6 +23,7 @@ export interface SampledPose {
   z: number;
   yaw: number;
   speed: number;
+  spinnerRpm: number;
   health: number;
   alive: boolean;
 }
@@ -48,16 +50,23 @@ function copyInto(out: SampledPose, snap: Snapshot): void {
   out.z = snap.z;
   out.yaw = snap.yaw;
   out.speed = snap.speed;
+  out.spinnerRpm = snap.spinnerRpm;
   out.health = snap.health;
   out.alive = snap.alive;
 }
 
 /**
  * Сэмплирует позу на момент `renderTime`. До старейшего снимка — держим
- * старейший; после новейшего — держим новейший (без экстраполяции телепортов).
- * Возвращает false, если буфер пуст.
+ * старейший. После новейшего — при `extrapolateMaxMs > 0` коротко экстраполируем
+ * по последней скорости/курсу (скрывает потерю пакетов), дальше держим новейший
+ * (без телепортов). Возвращает false, если буфер пуст.
  */
-export function sampleSnapshots(buffer: Snapshot[], renderTime: number, out: SampledPose): boolean {
+export function sampleSnapshots(
+  buffer: Snapshot[],
+  renderTime: number,
+  out: SampledPose,
+  extrapolateMaxMs = 0,
+): boolean {
   if (buffer.length === 0) return false;
   const first = buffer[0]!;
   const last = buffer[buffer.length - 1]!;
@@ -67,6 +76,12 @@ export function sampleSnapshots(buffer: Snapshot[], renderTime: number, out: Sam
   }
   if (renderTime >= last.t) {
     copyInto(out, last);
+    const ahead = renderTime - last.t;
+    if (extrapolateMaxMs > 0 && ahead > 0 && last.alive) {
+      const dtSec = Math.min(ahead, extrapolateMaxMs) / 1000;
+      out.x = last.x + Math.cos(last.yaw) * last.speed * dtSec;
+      out.z = last.z + Math.sin(last.yaw) * last.speed * dtSec;
+    }
     return true;
   }
   for (let i = 0; i < buffer.length - 1; i += 1) {
@@ -79,6 +94,7 @@ export function sampleSnapshots(buffer: Snapshot[], renderTime: number, out: Sam
       out.z = a.z + (b.z - a.z) * t;
       out.yaw = lerpAngle(a.yaw, b.yaw, t);
       out.speed = a.speed + (b.speed - a.speed) * t;
+      out.spinnerRpm = a.spinnerRpm + (b.spinnerRpm - a.spinnerRpm) * t;
       // Здоровье/жизнь — дискретные, берём из более позднего снимка.
       out.health = b.health;
       out.alive = b.alive;

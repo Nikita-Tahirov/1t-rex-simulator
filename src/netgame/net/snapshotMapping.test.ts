@@ -29,7 +29,20 @@ describe('snapshotMapping — граница unknown→typed', () => {
       z: 0,
       health: 700,
       alive: true,
+      spinnerRpm: 0,
+      dealt: {},
     });
+  });
+
+  it('нормализует spinnerRpm и dealt, отбрасывая мусор', () => {
+    const state = normalizeState({
+      x: 0,
+      spinnerRpm: 4200,
+      dealt: { victimA: 130, victimB: '5', victimC: -3 },
+    });
+    expect(state.spinnerRpm).toBe(4200);
+    // строка и отрицательное отбрасываются, остаётся положительное число.
+    expect(state.dealt).toEqual({ victimA: 130 });
   });
 
   it('нормализует полную комнату; возвращает null без meta', () => {

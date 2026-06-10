@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampToArena, closingSpeed, separateFromObstacles, stepArcade } from './battleArcade.ts';
+import { clampToArena, separateFromObstacles, stepArcade } from './battleArcade.ts';
 
 const PARAMS = { maxSpeed: 6, maxYawRate: 3, accelTau: 0.2, driveScale: 1 };
 
@@ -75,22 +75,5 @@ describe('separateFromObstacles', () => {
     const result = separateFromObstacles(0, 0, [{ x: 0, z: 0 }], 1);
     expect(Math.hypot(result.x, result.z)).toBeGreaterThan(0);
     expect(result.hitIndex).toBe(0);
-  });
-});
-
-describe('closingSpeed', () => {
-  it('лобовое сближение даёт сумму скоростей и симметрично', () => {
-    const a = { x: -1, z: 0, yaw: 0, speed: 4 }; // едет в +X
-    const b = { x: 1, z: 0, yaw: Math.PI, speed: 3 }; // едет в -X (навстречу)
-    const ab = closingSpeed(a, b);
-    const ba = closingSpeed(b, a);
-    expect(ab).toBeCloseTo(7, 5);
-    expect(ba).toBeCloseTo(7, 5);
-  });
-
-  it('расходящиеся роботы не сближаются', () => {
-    const a = { x: 0, z: 0, yaw: Math.PI, speed: 4 }; // едет в -X (от b)
-    const b = { x: 1, z: 0, yaw: 0, speed: 3 }; // едет в +X (от a)
-    expect(closingSpeed(a, b)).toBe(0);
   });
 });

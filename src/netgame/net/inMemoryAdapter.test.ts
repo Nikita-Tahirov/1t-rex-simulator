@@ -7,7 +7,18 @@ import type { NetworkPort } from './NetworkPort.ts';
 import type { PlayerState } from './types.ts';
 
 function liveState(health: number): PlayerState {
-  return { x: 0, z: 0, yaw: 0, speed: 0, health, alive: health > 0, seq: 1, t: 0 };
+  return {
+    x: 0,
+    z: 0,
+    yaw: 0,
+    speed: 0,
+    spinnerRpm: 0,
+    health,
+    alive: health > 0,
+    seq: 1,
+    t: 0,
+    dealt: {},
+  };
 }
 
 describe('inMemoryAdapter — поток лобби и боя', () => {

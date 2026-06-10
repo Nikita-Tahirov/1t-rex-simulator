@@ -66,6 +66,15 @@ export function normalizePlayer(uid: string, raw: unknown): PlayerInfo {
   };
 }
 
+function normalizeDealt(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [uid, value] of Object.entries(asRecord(raw))) {
+    const amount = asNumber(value, 0);
+    if (amount > 0) out[uid] = amount;
+  }
+  return out;
+}
+
 export function normalizeState(raw: unknown): PlayerState {
   const state = asRecord(raw);
   return {
@@ -73,10 +82,12 @@ export function normalizeState(raw: unknown): PlayerState {
     z: asNumber(state.z, 0),
     yaw: asNumber(state.yaw, 0),
     speed: asNumber(state.speed, 0),
+    spinnerRpm: asNumber(state.spinnerRpm, 0),
     health: asNumber(state.health, 0),
     alive: asBool(state.alive, false),
     seq: asNumber(state.seq, 0),
     t: asNumber(state.t, 0),
+    dealt: normalizeDealt(state.dealt),
   };
 }
 

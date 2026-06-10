@@ -12,7 +12,10 @@ export const COUNTDOWN_MS = 3000;
 export const STATE_PUBLISH_HZ = 12;
 
 /** Задержка интерполяции удалённых роботов (рендер «в прошлом»), мс. */
-export const INTERP_DELAY_MS = 120;
+export const INTERP_DELAY_MS = 130;
+
+/** Сколько экстраполировать позу призрака при пропуске пакетов, прежде чем замереть, мс. */
+export const EXTRAPOLATE_MAX_MS = 180;
 
 /** Старше этого порога снимок чужого робота считается устаревшим, мс. */
 export const STALE_GHOST_MS = 400;

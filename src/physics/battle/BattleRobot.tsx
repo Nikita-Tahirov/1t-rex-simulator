@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber';
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useCallback, useEffect, useRef } from 'react';
 import type { Group } from 'three';
 import { applyRobotDamage, resetRobotIntegrity } from '@/store/robotIntegrity.ts';
 import { telemetry } from '@/store/telemetry.ts';
@@ -11,10 +11,25 @@ import { BattleRobotVisual } from './BattleRobotVisual.tsx';
 import {
   type ArcadePose,
   clampToArena,
-  closingSpeed,
   separateFromObstacles,
   stepArcade,
 } from './battleArcade.ts';
+import {
+  addDealtDamage,
+  approachSpeed,
+  type CombatPose,
+  decaySpinnerRpm,
+  frontDot,
+  PVP_HIT_COOLDOWN_MS,
+  RAM_REACH_M,
+  ramDamage,
+  resetDealtDamage,
+  SPINNER_ACTIVE_RPM,
+  SPINNER_FRONT_DOT,
+  SPINNER_REACH_M,
+  spinnerDamage,
+  stepSpinnerRpm,
+} from './battleCombat.ts';
 import {
   type BattlePose,
   battlePoses,
@@ -27,10 +42,11 @@ import { SPAWN_HEIGHT, type SpawnPose } from './spawnPoints.ts';
  * Боевой робот сетевого режима — чисто визуальный (без Rapier RigidBody).
  *
  * Local: ведётся клавиатурой через аркадную кинематику (`battleArcade`), клампится
- * к стенам и расталкивается с соперниками вручную, получает урон по скорости
- * сближения через существующую модель `robotDamage`/`telemetry`. Пишет свою позу
- * в `telemetry` (камера и датчик прочности работают переиспользованием) и в
- * реестр поз. Remote: позу берёт из реестра (его наполняет хук интерполяции).
+ * к стенам и расталкивается с соперниками вручную. Спиннер управляется R/F (как в
+ * одиночке). Урон врагу НАНОСИТ атакующий (таран по своей скорости сближения и
+ * спиннер во фронтальном секторе) и шлёт его накопителем `dealt`; стены бьют себя.
+ * Пишет свою позу/обороты в `telemetry` и реестр поз. Remote: позу и обороты берёт
+ * из реестра (его наполняет хук интерполяции).
  */
 
 export interface BattleRobotConfig {
@@ -51,7 +67,6 @@ const ROBOT_MIN_DISTANCE = 1.0;
 const ACCEL_TAU = 0.18;
 const WALL_INSET = 0.6;
 const WALL_DAMAGE_MIN_SPEED = 1.5;
-const ENEMY_DAMAGE_MIN_SPEED = 1.0;
 const IMPACT_SPEED_BLEED = 0.35;
 const DEAD_SINK_Y = 0.04;
 const MAX_DT = 0.05;
@@ -74,21 +89,33 @@ function LocalBattleRobot({ config, arenaSize, active }: BattleRobotProps) {
     yaw: config.spawn.yaw,
     speed: 0,
   });
-  const lastImpact = useRef(-Infinity);
-  const others = useRef<BattlePose[]>([]);
+  const spinnerRpm = useRef(0);
+  const lastWallImpact = useRef(-Infinity);
+  const lastRamAt = useRef(new Map<string, number>());
+  const lastSpinAt = useRef(new Map<string, number>());
+  const otherPoses = useRef<BattlePose[]>([]);
+  const otherUids = useRef<string[]>([]);
+  const selfPose = useRef<CombatPose>({ x: 0, z: 0, yaw: 0, speed: 0 });
   const { x: spawnX, z: spawnZ, yaw: spawnYaw } = config.spawn;
 
   useEffect(() => {
     pose.current = { x: spawnX, z: spawnZ, yaw: spawnYaw, speed: 0 };
+    spinnerRpm.current = 0;
+    lastRamAt.current.clear();
+    lastSpinAt.current.clear();
     resetRobotIntegrity();
+    resetDealtDamage();
     telemetry.positionX = spawnX;
     telemetry.positionZ = spawnZ;
     telemetry.positionY = SPAWN_HEIGHT;
     telemetry.yaw = spawnYaw;
     telemetry.speed = 0;
-    setBattlePose(config.uid, spawnX, spawnZ, spawnYaw, 0, true);
+    telemetry.spinnerRpm = 0;
+    setBattlePose(config.uid, spawnX, spawnZ, spawnYaw, 0, 0, true);
     return () => removeBattlePose(config.uid);
   }, [config.uid, spawnX, spawnZ, spawnYaw]);
+
+  const getSpinnerRpm = useCallback(() => spinnerRpm.current, []);
 
   useFrame((_, dt) => {
     const group = groupRef.current;
@@ -96,11 +123,12 @@ function LocalBattleRobot({ config, arenaSize, active }: BattleRobotProps) {
     const dtc = Math.min(dt, MAX_DT);
     const alive = telemetry.robotHealth > 0;
     const p = pose.current;
+    const k = keys.current;
 
     if (active && alive) {
-      const k = keys.current;
       const throttle = (k.forward ? 1 : 0) - (k.backward ? 1 : 0);
       const turn = (k.right ? 1 : 0) - (k.left ? 1 : 0);
+      spinnerRpm.current = stepSpinnerRpm(spinnerRpm.current, k.spinnerUp, k.spinnerDown, dtc);
       const stepped = stepArcade(
         p,
         { throttle, turn, brake: k.brake ? 1 : 0 },
@@ -113,28 +141,34 @@ function LocalBattleRobot({ config, arenaSize, active }: BattleRobotProps) {
         dtc,
       );
 
-      const obstacles = others.current;
-      obstacles.length = 0;
-      for (const [id, other] of battlePoses) {
-        if (id !== config.uid && other.alive) obstacles.push(other);
-      }
-
+      collectOthers(config.uid, otherPoses.current, otherUids.current);
       const wall = clampToArena(stepped.x, stepped.z, arenaSize / 2 - WALL_INSET);
-      const sep = separateFromObstacles(wall.x, wall.z, obstacles, ROBOT_MIN_DISTANCE);
+      const sep = separateFromObstacles(wall.x, wall.z, otherPoses.current, ROBOT_MIN_DISTANCE);
       p.x = sep.x;
       p.z = sep.z;
       p.yaw = stepped.yaw;
       p.speed = stepped.speed;
 
+      // Стена бьёт сам себя (как столкновение с препятствием в одиночке).
       const speedAbs = Math.abs(stepped.speed);
-      if (wall.hit && speedAbs > WALL_DAMAGE_MIN_SPEED) applyImpactDamage(speedAbs, lastImpact);
-      if (sep.hitIndex >= 0) {
-        const closing = closingSpeed(p, obstacles[sep.hitIndex]!);
-        if (closing > ENEMY_DAMAGE_MIN_SPEED) applyImpactDamage(closing, lastImpact);
+      if (wall.hit && speedAbs > WALL_DAMAGE_MIN_SPEED) {
+        applyWallDamage(speedAbs, lastWallImpact);
       }
+      // Урон соперникам наносим МЫ (атакующий) — таран по своей скорости сближения
+      // и спиннер во фронтальном секторе. Жертва применит его по дельте `dealt`.
+      dealDamageToEnemies(
+        selfPose.current,
+        p,
+        spinnerRpm.current,
+        otherPoses.current,
+        otherUids.current,
+        lastRamAt.current,
+        lastSpinAt.current,
+      );
       if (wall.hit || sep.hitIndex >= 0) p.speed *= IMPACT_SPEED_BLEED;
     } else {
       p.speed = 0;
+      spinnerRpm.current = decaySpinnerRpm(spinnerRpm.current, dtc);
     }
 
     telemetry.positionX = p.x;
@@ -142,7 +176,8 @@ function LocalBattleRobot({ config, arenaSize, active }: BattleRobotProps) {
     telemetry.positionY = alive ? SPAWN_HEIGHT : SPAWN_HEIGHT - DEAD_SINK_Y;
     telemetry.yaw = p.yaw;
     telemetry.speed = p.speed;
-    setBattlePose(config.uid, p.x, p.z, p.yaw, p.speed, alive);
+    telemetry.spinnerRpm = spinnerRpm.current;
+    setBattlePose(config.uid, p.x, p.z, p.yaw, p.speed, spinnerRpm.current, alive);
     applyPoseToGroup(group, p.x, p.z, p.yaw, alive);
   });
 
@@ -150,6 +185,7 @@ function LocalBattleRobot({ config, arenaSize, active }: BattleRobotProps) {
     <BattleRobotVisual
       ref={groupRef}
       colorIndex={config.colorIndex}
+      getSpinnerRpm={getSpinnerRpm}
       damageVisual={damage.visualState}
     />
   );
@@ -160,9 +196,11 @@ function RemoteBattleRobot({ config }: { config: BattleRobotConfig }) {
   const { uid, spawn } = config;
 
   useEffect(() => {
-    setBattlePose(uid, spawn.x, spawn.z, spawn.yaw, 0, true);
+    setBattlePose(uid, spawn.x, spawn.z, spawn.yaw, 0, 0, true);
     return () => removeBattlePose(uid);
   }, [uid, spawn.x, spawn.z, spawn.yaw]);
+
+  const getSpinnerRpm = useCallback(() => battlePoses.get(uid)?.spinnerRpm ?? 0, [uid]);
 
   useFrame(() => {
     const group = groupRef.current;
@@ -171,7 +209,65 @@ function RemoteBattleRobot({ config }: { config: BattleRobotConfig }) {
     if (pose) applyPoseToGroup(group, pose.x, pose.z, pose.yaw, pose.alive);
   });
 
-  return <BattleRobotVisual ref={groupRef} colorIndex={config.colorIndex} />;
+  return (
+    <BattleRobotVisual
+      ref={groupRef}
+      colorIndex={config.colorIndex}
+      getSpinnerRpm={getSpinnerRpm}
+    />
+  );
+}
+
+/** Заполняет переиспользуемые массивы поз/uid живых соперников (без аллокаций). */
+function collectOthers(selfUid: string, poses: BattlePose[], uids: string[]): void {
+  poses.length = 0;
+  uids.length = 0;
+  for (const [id, other] of battlePoses) {
+    if (id !== selfUid && other.alive) {
+      poses.push(other);
+      uids.push(id);
+    }
+  }
+}
+
+/** Наносит соперникам урон тараном и спиннером (накопителем `dealt`). */
+function dealDamageToEnemies(
+  self: CombatPose,
+  p: ArcadePose,
+  rpm: number,
+  poses: readonly BattlePose[],
+  uids: readonly string[],
+  lastRamAt: Map<string, number>,
+  lastSpinAt: Map<string, number>,
+): void {
+  self.x = p.x;
+  self.z = p.z;
+  self.yaw = p.yaw;
+  self.speed = p.speed;
+  const now = performance.now();
+  for (let i = 0; i < poses.length; i += 1) {
+    const target = poses[i]!;
+    const vid = uids[i]!;
+    const dist = Math.hypot(target.x - p.x, target.z - p.z);
+    if (dist <= RAM_REACH_M) {
+      const dmg = ramDamage(approachSpeed(self, target));
+      if (dmg > 0 && now - (lastRamAt.get(vid) ?? -Infinity) >= PVP_HIT_COOLDOWN_MS) {
+        addDealtDamage(vid, dmg);
+        lastRamAt.set(vid, now);
+      }
+    }
+    if (
+      dist <= SPINNER_REACH_M &&
+      rpm >= SPINNER_ACTIVE_RPM &&
+      frontDot(self, target) > SPINNER_FRONT_DOT
+    ) {
+      const dmg = spinnerDamage(rpm);
+      if (dmg > 0 && now - (lastSpinAt.get(vid) ?? -Infinity) >= PVP_HIT_COOLDOWN_MS) {
+        addDealtDamage(vid, dmg);
+        lastSpinAt.set(vid, now);
+      }
+    }
+  }
 }
 
 function applyPoseToGroup(group: Group, x: number, z: number, yaw: number, alive: boolean): void {
@@ -180,7 +276,7 @@ function applyPoseToGroup(group: Group, x: number, z: number, yaw: number, alive
   group.rotation.set(0, -yaw, 0);
 }
 
-function applyImpactDamage(speedMps: number, lastImpactRef: RefObject<number>): void {
+function applyWallDamage(speedMps: number, lastImpactRef: RefObject<number>): void {
   const nowMs = performance.now();
   if (nowMs - lastImpactRef.current < ROBOT_IMPACT_DAMAGE_COOLDOWN_MS) return;
   const result = computeImpactDamageDelta({ speedMps });

@@ -19,6 +19,7 @@ import { playerList } from '../net/lobby.ts';
 import { BattleHud } from '../screens/BattleHud.tsx';
 import { useNetSessionContext } from '../session/netSessionContext.ts';
 import { useBattleOutcome } from '../session/useBattleOutcome.ts';
+import { useIncomingDamage } from '../sync/useIncomingDamage.ts';
 import { usePublishLocalState } from '../sync/usePublishLocalState.ts';
 import { useRemoteRobots } from '../sync/useRemoteRobots.ts';
 import { MATCH_TIMEOUT_MS } from './battleConfig.ts';
@@ -116,7 +117,7 @@ export function NetBattleScene() {
               />
             ))}
           </Physics>
-          <RemoteInterpolation localUid={uid} />
+          <RemoteSync localUid={uid} />
           <FollowCamera />
         </ArenaSizeProvider>
       </Canvas>
@@ -126,8 +127,9 @@ export function NetBattleScene() {
   );
 }
 
-function RemoteInterpolation({ localUid }: { localUid: string }) {
+function RemoteSync({ localUid }: { localUid: string }) {
   useRemoteRobots(localUid);
+  useIncomingDamage(localUid);
   return null;
 }
 

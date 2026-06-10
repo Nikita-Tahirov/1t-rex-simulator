@@ -13,7 +13,7 @@ function player(uid: string, colorIndex: number, joinedAt: number): PlayerInfo {
 }
 
 function state(health: number, alive = health > 0): PlayerState {
-  return { x: 0, z: 0, yaw: 0, speed: 0, health, alive, seq: 1, t: 0 };
+  return { x: 0, z: 0, yaw: 0, speed: 0, spinnerRpm: 0, health, alive, seq: 1, t: 0, dealt: {} };
 }
 
 function asMap<T>(entries: Array<[string, T]>): Record<string, T> {

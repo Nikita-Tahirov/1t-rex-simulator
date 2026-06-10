@@ -1,16 +1,20 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import { setBattlePose } from '@/physics/battle/battleRobotRegistry.ts';
-import { INTERP_DELAY_MS } from '../battle/battleConfig.ts';
+import { EXTRAPOLATE_MAX_MS, INTERP_DELAY_MS } from '../battle/battleConfig.ts';
 import { useNetRoomStore } from '../store/netRoomStore.ts';
 import { pushSnapshot, type SampledPose, type Snapshot, sampleSnapshots } from './interpolation.ts';
 
 /**
  * Интерполяция удалённых роботов: каждый кадр читает свежие `states` из стора,
- * копит таймстемпленные снимки по uid и пишет интерполированную (на
- * `INTERP_DELAY_MS` в прошлом) позу в общий реестр поз `battleRobotRegistry`.
- * Оттуда её берут визуальные `RemoteBattleRobot` и локальный контроллер (для
- * расталкивания/урона). Вызывается внутри `<Canvas>` (нужен `useFrame`).
+ * копит снимки по uid и пишет интерполированную (на `INTERP_DELAY_MS` в прошлом)
+ * позу в общий реестр `battleRobotRegistry`. Оттуда её берут визуальные
+ * `RemoteBattleRobot`. Вызывается внутри `<Canvas>` (нужен `useFrame`).
+ *
+ * Время буфера — ЛОКАЛЬНОЕ (`performance.now()` на приёме), а не таймстемп
+ * отправителя: часы клиентов не синхронизированы, и сравнение чужого `Date.now()`
+ * со своим ломало интерполяцию (главный источник рассинхрона). При пропуске
+ * пакетов поза коротко экстраполируется (`EXTRAPOLATE_MAX_MS`), затем замирает.
  */
 export function useRemoteRobots(localUid: string): void {
   const buffers = useRef(new Map<string, Snapshot[]>());
@@ -20,6 +24,7 @@ export function useRemoteRobots(localUid: string): void {
     z: 0,
     yaw: 0,
     speed: 0,
+    spinnerRpm: 0,
     health: 0,
     alive: false,
   });
@@ -27,7 +32,7 @@ export function useRemoteRobots(localUid: string): void {
   useFrame(() => {
     const room = useNetRoomStore.getState().room;
     if (!room) return;
-    const now = Date.now();
+    const now = performance.now();
     const renderTime = now - INTERP_DELAY_MS;
 
     for (const [uid, state] of Object.entries(room.states)) {
@@ -39,19 +44,21 @@ export function useRemoteRobots(localUid: string): void {
       }
       if (state.seq > (lastSeq.current.get(uid) ?? -1)) {
         lastSeq.current.set(uid, state.seq);
+        // Штамп ЛОКАЛЬНЫМ временем приёма — иммунно к рассинхрону часов.
         pushSnapshot(buffer, {
-          t: state.t || now,
+          t: now,
           x: state.x,
           z: state.z,
           yaw: state.yaw,
           speed: state.speed,
+          spinnerRpm: state.spinnerRpm,
           health: state.health,
           alive: state.alive,
         });
       }
-      if (sampleSnapshots(buffer, renderTime, scratch.current)) {
+      if (sampleSnapshots(buffer, renderTime, scratch.current, EXTRAPOLATE_MAX_MS)) {
         const pose = scratch.current;
-        setBattlePose(uid, pose.x, pose.z, pose.yaw, pose.speed, pose.alive);
+        setBattlePose(uid, pose.x, pose.z, pose.yaw, pose.speed, pose.spinnerRpm, pose.alive);
       }
     }
   });

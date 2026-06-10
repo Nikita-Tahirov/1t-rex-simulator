@@ -1,0 +1,101 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  addDealtDamage,
+  approachSpeed,
+  type CombatPose,
+  dealtRecord,
+  decaySpinnerRpm,
+  frontDot,
+  incomingDelta,
+  RAM_MIN_APPROACH_MPS,
+  ramDamage,
+  resetDealtDamage,
+  SPINNER_ACTIVE_RPM,
+  SPINNER_MAX_RPM,
+  spinnerDamage,
+  stepSpinnerRpm,
+} from './battleCombat.ts';
+
+afterEach(() => resetDealtDamage());
+
+describe('управление спиннером', () => {
+  it('R разгоняет до максимума, F тормозит до нуля, иначе держит', () => {
+    expect(stepSpinnerRpm(0, true, false, 1)).toBeCloseTo(800, 5);
+    expect(stepSpinnerRpm(SPINNER_MAX_RPM, true, false, 1)).toBe(SPINNER_MAX_RPM); // кламп сверху
+    expect(stepSpinnerRpm(1000, false, true, 1)).toBeCloseTo(0, 5); // 1000-1500 → 0 (кламп снизу)
+    expect(stepSpinnerRpm(3000, false, false, 1)).toBe(3000); // держит
+  });
+
+  it('затухание тянет обороты к нулю', () => {
+    expect(decaySpinnerRpm(1000, 1)).toBeCloseTo(0, 5);
+    expect(decaySpinnerRpm(5000, 1)).toBeCloseTo(3500, 5);
+  });
+});
+
+describe('approachSpeed (односторонняя скорость сближения атакующего)', () => {
+  const target: CombatPose = { x: 2, z: 0, yaw: 0, speed: 0 };
+
+  it('движение НА цель даёт положительную скорость', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 3 }; // едет в +X на цель
+    expect(approachSpeed(self, target)).toBeCloseTo(3, 5);
+  });
+
+  it('стоящий робот НЕ сближается (не бьёт сам себя)', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 };
+    expect(approachSpeed(self, target)).toBe(0);
+  });
+
+  it('движение ОТ цели не считается сближением', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: Math.PI, speed: 3 }; // едет в −X, от цели
+    expect(approachSpeed(self, target)).toBe(0);
+  });
+});
+
+describe('frontDot (фронтальный сектор спиннера)', () => {
+  it('цель прямо по носу → ~1, сзади → отрицательно', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 };
+    expect(frontDot(self, { x: 2, z: 0, yaw: 0, speed: 0 })).toBeCloseTo(1, 5);
+    expect(frontDot(self, { x: -2, z: 0, yaw: 0, speed: 0 })).toBeCloseTo(-1, 5);
+  });
+});
+
+describe('урон', () => {
+  it('таран ниже порога не наносит урона, выше — положительный', () => {
+    expect(ramDamage(RAM_MIN_APPROACH_MPS)).toBe(0);
+    expect(ramDamage(6)).toBeGreaterThan(0);
+  });
+
+  it('спиннер ниже активных оборотов не бьёт; растёт с оборотами', () => {
+    expect(spinnerDamage(SPINNER_ACTIVE_RPM - 1)).toBe(0);
+    const mid = spinnerDamage(SPINNER_MAX_RPM / 2);
+    const full = spinnerDamage(SPINNER_MAX_RPM);
+    expect(mid).toBeGreaterThan(0);
+    expect(full).toBeGreaterThan(mid);
+  });
+});
+
+describe('накопитель нанесённого урона', () => {
+  it('копит, округляет и сбрасывается', () => {
+    addDealtDamage('victim', 10.4);
+    addDealtDamage('victim', 5.2);
+    addDealtDamage('other', 3);
+    addDealtDamage('zero', 0); // игнор
+    expect(dealtRecord()).toEqual({ victim: 16, other: 3 });
+    resetDealtDamage();
+    expect(dealtRecord()).toEqual({});
+  });
+});
+
+describe('incomingDelta (применение жертвой по дельте)', () => {
+  it('первое наблюдение — только базис, без ретро-урона', () => {
+    expect(incomingDelta(120, undefined)).toEqual({ delta: 0, next: 120 });
+  });
+
+  it('рост счётчика даёт дельту', () => {
+    expect(incomingDelta(150, 120)).toEqual({ delta: 30, next: 150 });
+  });
+
+  it('падение счётчика (рестарт матча) — новый базис без урона', () => {
+    expect(incomingDelta(20, 300)).toEqual({ delta: 0, next: 20 });
+  });
+});

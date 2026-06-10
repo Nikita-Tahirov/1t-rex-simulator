@@ -56,12 +56,16 @@
             "z": { ".validate": "newData.isNumber()" },
             "yaw": { ".validate": "newData.isNumber()" },
             "speed": { ".validate": "newData.isNumber()" },
+            "spinnerRpm": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "health": {
               ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000"
             },
             "alive": { ".validate": "newData.isBoolean()" },
             "seq": { ".validate": "newData.isNumber()" },
             "t": { ".validate": "newData.isNumber()" },
+            "dealt": {
+              "$victim": { ".validate": "newData.isNumber() && newData.val() >= 0" }
+            },
             "$other": { ".validate": false }
           }
         }

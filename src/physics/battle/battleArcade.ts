@@ -108,27 +108,3 @@ export function separateFromObstacles(
   }
   return { x: rx, z: rz, hitIndex };
 }
-
-export interface MovingPose {
-  x: number;
-  z: number;
-  yaw: number;
-  speed: number;
-}
-
-/**
- * Скорость сближения двух роботов вдоль линии между их центрами, м/с.
- * Симметрична: оба клиента вычисляют одно и то же значение → одинаковый урон при
- * self-authoritative здоровье (атакующий не получает несправедливо больше).
- */
-export function closingSpeed(self: MovingPose, other: MovingPose): number {
-  const myVx = Math.cos(self.yaw) * self.speed;
-  const myVz = Math.sin(self.yaw) * self.speed;
-  const enVx = Math.cos(other.yaw) * other.speed;
-  const enVz = Math.sin(other.yaw) * other.speed;
-  const dirX = other.x - self.x;
-  const dirZ = other.z - self.z;
-  const dist = Math.hypot(dirX, dirZ);
-  if (dist < 1e-6) return Math.hypot(myVx - enVx, myVz - enVz);
-  return Math.max(0, ((myVx - enVx) * dirX + (myVz - enVz) * dirZ) / dist);
-}
