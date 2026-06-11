@@ -84,6 +84,21 @@ export function makeBattlePose(x = 0, z = 0, yaw = 0, y = 0, alive = true): Batt
   return pose;
 }
 
+/**
+ * Заполняет переиспользуемые массивы поз/uid ЖИВЫХ соперников (без аллокаций,
+ * hot-path). Общий сборщик целей melee для dynamic- и kinematic-контроллеров.
+ */
+export function collectAliveOthers(selfUid: string, poses: BattlePose[], uids: string[]): void {
+  poses.length = 0;
+  uids.length = 0;
+  for (const [id, other] of battlePoses) {
+    if (id !== selfUid && other.alive) {
+      poses.push(other);
+      uids.push(id);
+    }
+  }
+}
+
 export function removeBattlePose(uid: string): void {
   battlePoses.delete(uid);
 }

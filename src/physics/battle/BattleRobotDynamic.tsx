@@ -21,7 +21,7 @@ import { MAX_DT, yawQuat } from './battleBodyShared.ts';
 import {
   addDealtDamage,
   type CombatPose,
-  dealSpinnerProximityDamage,
+  dealMeleeDamage,
   decaySpinnerRpm,
   resetDealtDamage,
   stepSpinnerRpm,
@@ -32,10 +32,11 @@ import {
   wallImpactExceeds,
 } from './battleContactDamage.ts';
 import { computeDriveForces, type DriveParams } from './battleDrive.ts';
+import { pushHit, resetHitFeed } from './battleHitFeed.ts';
 import { drainKnockback, type KnockbackImpulse, resetKnockback } from './battleKnockback.ts';
 import {
   type BattlePose,
-  battlePoses,
+  collectAliveOthers,
   makeBattlePose,
   removeBattlePose,
   setBattlePose,
@@ -50,10 +51,12 @@ import { SPAWN_HEIGHT } from './spawnPoints.ts';
  * `battleDrive`): инерция, наезды/заклинивание, опрокидывание выпадают из физики.
  * Шасси — коробка + передний клин ([`BattleChassisColliders`]): соперник заезжает
  * по клину и попадает под диск. Ротор — отдельное физ-тело ([`BattleRotor`]),
- * реально бьющее заехавшего. Урон сопернику: таран — по контактной силе
- * (`onContactForce`), спиннер — контакт диска + проксимити-добивка, всё в
- * накопитель `dealt`. Входящий урон превращается в knockback-отброс
- * ([`battleKnockback`]). Удалённые роботы — в [`BattleRemoteRobot`].
+ * реально бьющее заехавшего. Урон сопернику: таран — по скорости сближения
+ * (`dealMeleeDamage`, надёжная регистрация) ПЛЮС пики контактной силы
+ * (`onContactForce`, жёсткие удары), кулдаун общий; спиннер — контакт диска +
+ * проксимити-добивка. Всё в накопитель `dealt` и hit-ленту индикации. Входящий
+ * урон превращается в knockback-отброс ([`battleKnockback`]). Удалённые
+ * роботы — в [`BattleRemoteRobot`].
  */
 
 const DRIVE_PARAMS: DriveParams = {
@@ -113,6 +116,7 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
     resetRobotIntegrity();
     resetDealtDamage();
     resetKnockback();
+    resetHitFeed();
     telemetry.positionX = spawn.x;
     telemetry.positionZ = spawn.z;
     telemetry.positionY = SPAWN_HEIGHT;
@@ -147,6 +151,7 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
         });
         if (result.damage > 0) {
           applyRobotDamage({ amount: result.damage, source: 'impact', nowMs: now });
+          pushHit(uid, result.damage, 'taken');
         }
       }
     },
@@ -206,8 +211,11 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
     const pos = chassis.translation();
     const yaw = Math.atan2(fwd.current.z, fwd.current.x);
 
-    // Спиннер бьёт соперника по проксимити (его коллайдер утоплен в корпус —
-    // через реальный контакт достаёт редко). Таран — отдельно, через onContactForce.
+    // Melee по проксимити: спиннер (коллайдер утоплен в корпус — через реальный
+    // контакт достаёт редко) И таран по скорости сближения. Контактный таран
+    // (onContactForce) ловит только редкие пики силы >700 Н — типичные удары
+    // оставались без урона и бой выглядел «без обратной связи». Кулдаун-карта
+    // lastRamAt ОБЩАЯ с контактным путём — один удар не учитывается дважды.
     if (active && alive) {
       collectAliveOthers(uid, otherPoses.current, otherUids.current);
       const self = selfCombat.current;
@@ -215,12 +223,13 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
       self.z = pos.z;
       self.yaw = yaw;
       self.speed = forwardSpeed;
-      dealSpinnerProximityDamage(
+      dealMeleeDamage(
         self,
         otherPoses.current,
         otherUids.current,
         spinnerRpm.current,
         performance.now(),
+        lastRamAt.current,
         lastSpinAt.current,
       );
     }
@@ -276,16 +285,4 @@ export function LocalDynamicRobot({ config, active }: BattleRobotProps) {
       />
     </>
   );
-}
-
-/** Заполняет переиспользуемые массивы поз/uid живых соперников (без аллокаций). */
-function collectAliveOthers(selfUid: string, poses: BattlePose[], uids: string[]): void {
-  poses.length = 0;
-  uids.length = 0;
-  for (const [id, other] of battlePoses) {
-    if (id !== selfUid && other.alive) {
-      poses.push(other);
-      uids.push(id);
-    }
-  }
 }

@@ -9,6 +9,7 @@ import { Arena } from '@/physics/Arena.tsx';
 import { ArenaSizeProvider } from '@/physics/ArenaSizeContext.tsx';
 import { BattleRobot } from '@/physics/battle/BattleRobot.tsx';
 import { clearBattlePoses } from '@/physics/battle/battleRobotRegistry.ts';
+import { DamagePopups } from '@/physics/battle/DamagePopups.tsx';
 import { cornerSpawn } from '@/physics/battle/spawnPoints.ts';
 import { FollowCamera } from '@/physics/FollowCamera.tsx';
 import { SceneBackdrop } from '@/physics/SceneBackdrop.tsx';
@@ -119,6 +120,7 @@ export function NetBattleScene() {
             ))}
           </Physics>
           <RemoteSync localUid={uid} />
+          <DamagePopups />
           <FollowCamera />
         </ArenaSizeProvider>
       </Canvas>
