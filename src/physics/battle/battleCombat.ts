@@ -11,6 +11,7 @@
 
 import { ROBOT } from '../constants.ts';
 import { computeImpactDamageDelta } from '../robotDamage.ts';
+import { pushHit } from './battleHitFeed.ts';
 
 /** Максимальные обороты спиннера (как в одиночке). */
 export const SPINNER_MAX_RPM = ROBOT.spinnerMaxRpm;
@@ -98,10 +99,13 @@ export function spinnerDamage(rpm: number): number {
 
 const localDealt = new Map<string, number>();
 
-/** Добавляет нанесённый урон сопернику (накопительно). */
+/** Добавляет нанесённый урон сопернику (накопительно) и событие в hit-ленту. */
 export function addDealtDamage(victimUid: string, amount: number): void {
   if (!(amount > 0)) return;
   localDealt.set(victimUid, (localDealt.get(victimUid) ?? 0) + amount);
+  // Единая точка всех путей нанесения (таран, контакт ротора, проксимити) —
+  // отсюда же уходит индикация попадания на экран атакующего.
+  pushHit(victimUid, amount, 'dealt');
 }
 
 /** Снимок накопителя для публикации (целые числа, только ненулевые). */
@@ -170,33 +174,6 @@ export function dealMeleeDamage(
         addDealtDamage(vid, dmg);
         lastSpinAt.set(vid, now);
       }
-    }
-  }
-}
-
-/**
- * Только СПИННЕРНЫЙ урон по проксимити (для dynamic-пути, где таран идёт через
- * реальные Rapier-контакты, а коллайдер диска утоплен в корпус и редко достаёт).
- * Гарантирует, что раскрученный ротор бьёт соперника во фронтальном секторе.
- */
-export function dealSpinnerProximityDamage(
-  self: CombatPose,
-  poses: readonly Point[],
-  uids: readonly string[],
-  rpm: number,
-  now: number,
-  lastSpinAt: Map<string, number>,
-): void {
-  if (rpm < SPINNER_ACTIVE_RPM) return;
-  for (let i = 0; i < poses.length; i += 1) {
-    const target = poses[i]!;
-    const vid = uids[i]!;
-    const dist = Math.hypot(target.x - self.x, target.z - self.z);
-    if (dist > SPINNER_REACH_M || frontDot(self, target) <= SPINNER_FRONT_DOT) continue;
-    const dmg = spinnerDamage(rpm);
-    if (dmg > 0 && now - (lastSpinAt.get(vid) ?? -Infinity) >= PVP_HIT_COOLDOWN_MS) {
-      addDealtDamage(vid, dmg);
-      lastSpinAt.set(vid, now);
     }
   }
 }

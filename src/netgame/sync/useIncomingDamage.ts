@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber';
 import { useRef } from 'react';
 import { incomingDelta } from '@/physics/battle/battleCombat.ts';
+import { pushHit } from '@/physics/battle/battleHitFeed.ts';
 import {
   type KnockbackImpulse,
   knockbackImpulse,
@@ -42,6 +43,8 @@ export function useIncomingDamage(localUid: string): void {
       applied.current.set(attacker, next);
       total += delta;
       if (delta > 0) {
+        // Полученный удар виден и жертве: красное число над своим роботом.
+        pushHit(localUid, delta, 'taken');
         const attackerPose = battlePoses.get(attacker);
         if (
           attackerPose &&

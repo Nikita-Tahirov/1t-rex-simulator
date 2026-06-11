@@ -62,7 +62,12 @@ export function BattleHud({ active, countdownEnd }: { active: boolean; countdown
 
       {/* top-center: не конфликтует с тач-управлением (слева) и соперниками (справа). */}
       <div className="sim-panel pointer-events-auto absolute top-4 left-1/2 w-56 -translate-x-1/2 p-3">
-        <p className="mb-1 text-xs text-[var(--color-text-dim)]">{NET_STRINGS.battleYouHealth}</p>
+        <p className="mb-1 flex items-baseline justify-between text-xs text-[var(--color-text-dim)]">
+          <span>{NET_STRINGS.battleYouHealth}</span>
+          <span className="font-mono tabular-nums" data-testid="self-health">
+            {formatHealth(selfHealth)}/{ROBOT_MAX_HEALTH}
+          </span>
+        </p>
         <HealthBar ratio={selfHealth / ROBOT_MAX_HEALTH} />
         <p className="mt-2 text-xs text-[var(--color-text-dim)]">
           {NET_STRINGS.battleAliveCount(aliveCount, players.length)}
@@ -83,6 +88,12 @@ export function BattleHud({ active, countdownEnd }: { active: boolean; countdown
                 </span>
                 <span className="flex-1">
                   <HealthBar ratio={health / ROBOT_MAX_HEALTH} />
+                </span>
+                <span
+                  className="w-8 text-right font-mono text-[10px] tabular-nums text-[var(--color-text-dim)]"
+                  data-testid={`opponent-health-${opponent.uid}`}
+                >
+                  {formatHealth(health)}
                 </span>
               </li>
             );
@@ -107,6 +118,11 @@ export function BattleHud({ active, countdownEnd }: { active: boolean; countdown
       </div>
     </div>
   );
+}
+
+/** Целое HP для HUD: живой робот не показывает 0 из-за округления вниз. */
+function formatHealth(health: number): number {
+  return Math.max(0, Math.ceil(health));
 }
 
 function HealthBar({ ratio }: { ratio: number }) {

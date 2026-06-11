@@ -4,7 +4,6 @@ import {
   approachSpeed,
   type CombatPose,
   dealMeleeDamage,
-  dealSpinnerProximityDamage,
   dealtRecord,
   decaySpinnerRpm,
   frontDot,
@@ -17,8 +16,13 @@ import {
   spinnerDamage,
   stepSpinnerRpm,
 } from './battleCombat.ts';
+import { passesContactCooldown } from './battleContactDamage.ts';
+import { drainHits, type HitEvent, resetHitFeed } from './battleHitFeed.ts';
 
-afterEach(() => resetDealtDamage());
+afterEach(() => {
+  resetDealtDamage();
+  resetHitFeed();
+});
 
 describe('управление спиннером', () => {
   it('R разгоняет до максимума, F тормозит до нуля, иначе держит', () => {
@@ -146,26 +150,30 @@ describe('dealMeleeDamage (нанесение тарана/спиннера за
   });
 });
 
-describe('dealSpinnerProximityDamage (ротор бьёт по проксимити в dynamic-пути)', () => {
-  it('раскрученный ротор бьёт врага по носу, ниже порога оборотов — нет', () => {
-    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 };
-    dealSpinnerProximityDamage(
-      self,
-      [{ x: 1.2, z: 0 }],
-      ['e'],
-      SPINNER_ACTIVE_RPM - 1,
-      1,
-      new Map(),
-    );
-    expect(dealtRecord()).toEqual({});
-    dealSpinnerProximityDamage(self, [{ x: 1.2, z: 0 }], ['e'], SPINNER_MAX_RPM, 1, new Map());
-    expect(dealtRecord().e).toBe(Math.round(spinnerDamage(SPINNER_MAX_RPM)));
+describe('общий кулдаун контактного и проксимити-тарана (нет двойного учёта)', () => {
+  it('контактный хит блокирует проксимити-таран в окне кулдауна и наоборот', () => {
+    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 6 }; // едет в упор
+    const lastRamAt = new Map<string, number>();
+    // Контактный путь зарегистрировал удар (как в onContactForce).
+    expect(passesContactCooldown(lastRamAt, 'e', 1000)).toBe(true);
+    addDealtDamage('e', 10);
+    // Проксимити-таран в том же окне НЕ добавляет второй удар.
+    dealMeleeDamage(self, [{ x: 1.0, z: 0 }], ['e'], 0, 1100, lastRamAt, new Map());
+    expect(dealtRecord().e).toBe(10);
+    // После окна кулдауна таран снова проходит.
+    dealMeleeDamage(self, [{ x: 1.0, z: 0 }], ['e'], 0, 1400, lastRamAt, new Map());
+    expect(dealtRecord().e).toBeGreaterThan(10);
   });
+});
 
-  it('врага позади или вне досягаемости не бьёт', () => {
-    const self: CombatPose = { x: 0, z: 0, yaw: 0, speed: 0 };
-    dealSpinnerProximityDamage(self, [{ x: -1.2, z: 0 }], ['e'], SPINNER_MAX_RPM, 1, new Map());
-    dealSpinnerProximityDamage(self, [{ x: 5, z: 0 }], ['e'], SPINNER_MAX_RPM, 1, new Map());
-    expect(dealtRecord()).toEqual({});
+describe('hit-лента индикации попаданий', () => {
+  it('addDealtDamage пушит событие dealt с суммой удара', () => {
+    addDealtDamage('victim', 26);
+    const events: HitEvent[] = [];
+    drainHits(events);
+    expect(events).toEqual([{ uid: 'victim', amount: 26, kind: 'dealt' }]);
+    // Очередь опустошена: повторный дрен возвращает пустой scratch.
+    drainHits(events);
+    expect(events).toHaveLength(0);
   });
 });

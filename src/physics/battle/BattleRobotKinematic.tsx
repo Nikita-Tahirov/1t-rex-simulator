@@ -21,9 +21,11 @@ import {
   resetDealtDamage,
   stepSpinnerRpm,
 } from './battleCombat.ts';
+import { pushHit, resetHitFeed } from './battleHitFeed.ts';
 import {
   type BattlePose,
   battlePoses,
+  collectAliveOthers,
   makeBattlePose,
   removeBattlePose,
   setBattlePose,
@@ -96,6 +98,7 @@ export function LocalKinematicRobot({ config, arenaSize, active }: BattleRobotPr
     lastSpinAt.current.clear();
     resetRobotIntegrity();
     resetDealtDamage();
+    resetHitFeed();
     telemetry.positionX = spawnX;
     telemetry.positionZ = spawnZ;
     telemetry.positionY = SPAWN_HEIGHT;
@@ -132,7 +135,7 @@ export function LocalKinematicRobot({ config, arenaSize, active }: BattleRobotPr
         dtc,
       );
 
-      collectOthers(config.uid, otherPoses.current, otherUids.current);
+      collectAliveOthers(config.uid, otherPoses.current, otherUids.current);
       const wall = clampToArena(stepped.x, stepped.z, arenaSize / 2 - WALL_INSET);
       const sep = separateFromObstacles(wall.x, wall.z, otherPoses.current, ROBOT_MIN_DISTANCE);
       p.x = sep.x;
@@ -142,7 +145,7 @@ export function LocalKinematicRobot({ config, arenaSize, active }: BattleRobotPr
 
       const speedAbs = Math.abs(stepped.speed);
       if (wall.hit && speedAbs > WALL_DAMAGE_MIN_SPEED) {
-        applyWallDamage(speedAbs, lastWallImpact);
+        applyWallDamage(config.uid, speedAbs, lastWallImpact);
       }
       const self = selfPose.current;
       self.x = p.x;
@@ -212,25 +215,17 @@ export function RemoteKinematicRobot({ config }: { config: BattleRobotConfig }) 
   );
 }
 
-/** Заполняет переиспользуемые массивы поз/uid живых соперников (без аллокаций). */
-function collectOthers(selfUid: string, poses: BattlePose[], uids: string[]): void {
-  poses.length = 0;
-  uids.length = 0;
-  for (const [id, other] of battlePoses) {
-    if (id !== selfUid && other.alive) {
-      poses.push(other);
-      uids.push(id);
-    }
-  }
-}
-
 function applyPoseToGroup(group: Group, x: number, z: number, yaw: number, alive: boolean): void {
   group.position.set(x, alive ? SPAWN_HEIGHT : SPAWN_HEIGHT - DEAD_SINK_Y, z);
   // Yaw-конвенция симулятора: поворот вокруг мировой −Y (см. robotGroundPose).
   group.rotation.set(0, -yaw, 0);
 }
 
-function applyWallDamage(speedMps: number, lastImpactRef: RefObject<number>): void {
+function applyWallDamage(
+  selfUid: string,
+  speedMps: number,
+  lastImpactRef: RefObject<number>,
+): void {
   const nowMs = performance.now();
   if (nowMs - lastImpactRef.current < ROBOT_IMPACT_DAMAGE_COOLDOWN_MS) return;
   const result = computeImpactDamageDelta({ speedMps });
@@ -242,4 +237,5 @@ function applyWallDamage(speedMps: number, lastImpactRef: RefObject<number>): vo
     nowMs,
     energyJ: Math.max(result.kineticEnergyJ, result.impulseEnergyJ),
   });
+  pushHit(selfUid, result.damage, 'taken');
 }

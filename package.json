@@ -48,7 +48,7 @@
     "e2e:experiments:fast": "playwright test e2e/experiments.spec.ts --project=chromium --grep-invert @scenario-slow",
     "e2e:experiments:slow": "playwright test e2e/experiments.spec.ts --project=chromium --grep @scenario-slow",
     "e2e:smoke": "playwright test e2e/cross-env.spec.ts",
-    "e2e:net": "playwright test e2e/netgame.spec.ts e2e/netgame-stress.spec.ts --project=chromium",
+    "e2e:net": "playwright test e2e/netgame.spec.ts e2e/netgame-stress.spec.ts e2e/netgame-damage.spec.ts --project=chromium",
     "e2e:perf": "playwright test e2e/performance.spec.ts --project=chromium",
     "eslint": "eslint .",
     "agent:check": "node scripts/check-agent-infra.mjs",
