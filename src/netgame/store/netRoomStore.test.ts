@@ -30,6 +30,7 @@ describe('netRoomStore', () => {
       rooms: [],
       playerName: '',
       error: null,
+      connected: null,
     });
   });
 
@@ -44,6 +45,16 @@ describe('netRoomStore', () => {
     expect(next.playerName).toBe('Пилот');
     expect(next.roomId).toBe('r1');
     expect(next.room?.meta.roomId).toBe('r1');
+  });
+
+  it('setConnected хранит состояние соединения; leaveRoom его не трогает', () => {
+    const store = useNetRoomStore.getState();
+    expect(useNetRoomStore.getState().connected).toBeNull();
+    store.setConnected(false);
+    expect(useNetRoomStore.getState().connected).toBe(false);
+    store.setConnected(true);
+    useNetRoomStore.getState().leaveRoom();
+    expect(useNetRoomStore.getState().connected).toBe(true);
   });
 
   it('leaveRoom сбрасывает комнату, но сохраняет uid и имя', () => {

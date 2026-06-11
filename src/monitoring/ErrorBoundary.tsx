@@ -34,6 +34,16 @@ export class ErrorBoundary extends Component<Props, State> {
         <section className="max-w-md">
           <h1 className="text-xl font-bold">Симулятор остановлен</h1>
           <p className="mt-3 text-sm text-text-dim">{this.state.message}</p>
+          {/* Типовая причина — протухшая вкладка после деплоя: dynamic import
+              чанка со старым хэшем получает SPA-fallback HTML и падает.
+              Перезагрузка забирает свежий index.html и полностью чинит. */}
+          <button
+            type="button"
+            className="sim-control mt-5 px-4 py-2"
+            onClick={() => window.location.reload()}
+          >
+            Перезагрузить страницу
+          </button>
         </section>
       </main>
     );

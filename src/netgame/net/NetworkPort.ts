@@ -27,6 +27,13 @@ export interface NetworkPort {
   /** Подписка на общий список открытых комнат (лобби-экран). */
   listRooms(callback: (rooms: RoomListItem[]) => void): Unsubscribe;
 
+  /**
+   * Подписка на фактическое состояние соединения с сервером. `false` —
+   * транспорт недоступен (блокировщик/файрвол/обрыв): операции будут падать по
+   * таймауту, UI обязан предупредить игрока ДО кликов. In-memory всегда `true`.
+   */
+  watchConnected(callback: (connected: boolean) => void): Unsubscribe;
+
   /** Создать комнату; создатель становится host и сразу входит. → roomId. */
   createRoom(roomName: string, playerName: string): Promise<string>;
 

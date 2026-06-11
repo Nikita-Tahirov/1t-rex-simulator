@@ -21,9 +21,16 @@ export interface NetRoomState {
    * UI обязан показать предупреждение.
    */
   adapterKind: 'firebase' | 'memory' | null;
+  /**
+   * Реальное соединение с сервером (`.info/connected`): `false` — сокет
+   * недоступен (блокировщик/файрвол), операции упадут по таймауту; `null` —
+   * ещё неизвестно. UI предупреждает игрока до кликов.
+   */
+  connected: boolean | null;
 
   setUid: (uid: string | null) => void;
   setAdapterKind: (kind: 'firebase' | 'memory' | null) => void;
+  setConnected: (connected: boolean | null) => void;
   setRoomId: (roomId: string | null) => void;
   setRoom: (room: RoomSnapshot | null) => void;
   setRooms: (rooms: RoomListItem[]) => void;
@@ -41,9 +48,11 @@ export const useNetRoomStore = create<NetRoomState>()((set) => ({
   playerName: '',
   error: null,
   adapterKind: null,
+  connected: null,
 
   setUid: (uid) => set({ uid }),
   setAdapterKind: (adapterKind) => set({ adapterKind }),
+  setConnected: (connected) => set({ connected }),
   setRoomId: (roomId) => set({ roomId }),
   setRoom: (room) => set({ room }),
   setRooms: (rooms) => set({ rooms }),

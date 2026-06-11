@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { NetSessionContext } from '../session/netSessionContext.ts';
 import type { NetSession } from '../session/useNetSession.ts';
+import { useNetRoomStore } from '../store/netRoomStore.ts';
 import { NET_STRINGS } from '../strings.ts';
 import { RoomListScreen } from './RoomListScreen.tsx';
 
@@ -61,5 +62,25 @@ describe('RoomListScreen — гейтинг по готовности порта
   it('uid задан + комната в лобби: «Войти» активен', () => {
     renderWithSession({ uid: 'uid_ready', rooms: [sampleRoom] });
     expect(screen.getByRole('button', { name: NET_STRINGS.roomsJoin })).toBeEnabled();
+  });
+});
+
+describe('RoomListScreen — индикация недоступного сервера', () => {
+  it('firebase + connected=false: предупреждение «нет соединения» видно', () => {
+    useNetRoomStore.setState({ adapterKind: 'firebase', connected: false });
+    renderWithSession({ uid: 'uid_ready' });
+    expect(screen.getByText(NET_STRINGS.netNoConnection)).toBeInTheDocument();
+  });
+
+  it('firebase + connected=true: предупреждения нет', () => {
+    useNetRoomStore.setState({ adapterKind: 'firebase', connected: true });
+    renderWithSession({ uid: 'uid_ready' });
+    expect(screen.queryByText(NET_STRINGS.netNoConnection)).toBeNull();
+  });
+
+  it('memory-адаптер: предупреждение о сокете не показывается (соединения нет по определению)', () => {
+    useNetRoomStore.setState({ adapterKind: 'memory', connected: null });
+    renderWithSession({ uid: 'uid_ready' });
+    expect(screen.queryByText(NET_STRINGS.netNoConnection)).toBeNull();
   });
 });

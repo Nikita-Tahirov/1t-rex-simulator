@@ -67,6 +67,12 @@ export function createInMemoryPort(uid: string, options: Options = {}): NetworkP
     listRooms: (callback) => inMemoryBackend.subscribeList(callback),
     subscribeRoom: (roomId, callback) => inMemoryBackend.subscribeRoom(roomId, callback),
 
+    watchConnected(callback) {
+      // Без сети соединение «есть» всегда: backend в этом же JS-контексте.
+      callback(true);
+      return () => {};
+    },
+
     async createRoom(roomName, playerName) {
       const roomId = randomId('room');
       const now = Date.now();
