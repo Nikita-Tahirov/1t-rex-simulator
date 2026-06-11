@@ -13,6 +13,7 @@ export function RoomListScreen() {
   const setNetScreen = useAppModeStore((s) => s.setNetScreen);
   const exitNet = useAppModeStore((s) => s.exitNet);
   const adapterKind = useNetRoomStore((s) => s.adapterKind);
+  const connected = useNetRoomStore((s) => s.connected);
   const [newRoomName, setNewRoomName] = useState('');
   // Гард повторного клика: createRoom/joinRoom асинхронны (firebase ждёт
   // round-trip), и дабл-клик без гарда создавал две одинаковые комнаты.
@@ -24,6 +25,9 @@ export function RoomListScreen() {
   // memory вместо ожидавшегося firebase = тихая деградация (блокировщик/оффлайн):
   // комнаты НЕ видны другим устройствам — обязаны предупредить.
   const degraded = adapterKind === 'memory' && resolveAdapterKind() === 'firebase';
+  // Auth прошёл, а сокет RTDB заблокирован: без предупреждения клик «Создать
+  // комнату» выглядел бы зависшим (операции упадут по таймауту порта).
+  const offline = adapterKind === 'firebase' && connected === false;
 
   const submitCreate = async () => {
     if (pending || connecting) return;
@@ -77,6 +81,9 @@ export function RoomListScreen() {
 
       {connecting && (
         <p className="mb-3 text-sm text-[var(--color-text-dim)]">{NET_STRINGS.roomConnecting}</p>
+      )}
+      {offline && (
+        <p className="mb-3 text-sm text-[var(--color-danger)]">{NET_STRINGS.netNoConnection}</p>
       )}
       {!connecting && degraded && (
         <p className="mb-3 text-sm text-[var(--color-danger)]">{NET_STRINGS.netDegraded}</p>

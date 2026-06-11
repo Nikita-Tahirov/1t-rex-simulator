@@ -43,6 +43,15 @@ describe('inMemoryAdapter — поток лобби и боя', () => {
     guest.dispose();
   });
 
+  it('watchConnected сразу сообщает true: backend в этом же контексте', () => {
+    let connected: boolean | null = null;
+    const unsub = host.watchConnected((value) => {
+      connected = value;
+    });
+    expect(connected).toBe(true);
+    unsub();
+  });
+
   it('создаёт комнату, хозяин входит в угол 0 и виден в списке', async () => {
     const roomId = await host.createRoom('Арена A', 'Хост');
     const room = inMemoryBackend.getRoom(roomId);

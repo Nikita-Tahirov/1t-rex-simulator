@@ -16,6 +16,7 @@ import type { NetworkPort } from './NetworkPort.ts';
 import { SWEEP_MIN_INTERVAL_MS, sweepCandidates } from './roomSweep.ts';
 import { normalizeRoom, normalizeRoomList } from './snapshotMapping.ts';
 import { MAX_PLAYERS, type RoomSnapshot } from './types.ts';
+import { NET_OP_TIMEOUT_MS, withTimeout } from './withTimeout.ts';
 
 /**
  * Реализация `NetworkPort` поверх Firebase Realtime Database + Anonymous Auth.
@@ -54,6 +55,14 @@ export async function createFirebasePort(): Promise<NetworkPort> {
   const stateRef = (roomId: string) => ref(db, `rooms/${roomId}/states/${uid}`);
   const indexRef = (roomId: string) => ref(db, `roomsIndex/${roomId}`);
   let lastSweepAt = 0;
+
+  /**
+   * Все пользовательские операции — под потолком ожидания: при недоступном
+   * RTDB-сокете SDK ставит записи в очередь и промисы не разрешаются никогда,
+   * а UI молча виснет (см. withTimeout.ts). Reject уходит в setError UI.
+   */
+  const guard = <T>(label: string, op: () => Promise<T>): Promise<T> =>
+    withTimeout(op(), NET_OP_TIMEOUT_MS, label);
 
   const readRoom = async (roomId: string): Promise<RoomSnapshot | null> => {
     const snapshot = await get(ref(db, `rooms/${roomId}`));
@@ -129,76 +138,88 @@ export async function createFirebasePort(): Promise<NetworkPort> {
       );
     },
 
-    async createRoom(roomName, playerName) {
-      const roomId = randomId('room');
-      const name = clampName(roomName, 'Комната');
-      // Один атомарный multi-path: комната появляется сразу с host-игроком и
-      // записью в индексе — либо целиком, либо никак (нет «невидимых» комнат).
-      await update(ref(db), {
-        [`rooms/${roomId}/meta`]: {
-          roomId,
-          name,
-          hostId: uid,
-          status: 'lobby',
-          arenaSeed: 0,
-          maxPlayers: MAX_PLAYERS,
-          createdAt: serverTimestamp(),
-          countdownEndsAt: null,
-          winnerId: null,
-        },
-        [`rooms/${roomId}/players/${uid}`]: {
+    watchConnected(callback) {
+      // `.info/connected` — серверная истина о соединении: false при блокировке
+      // сокета (auth при этом может быть успешным). UI предупреждает игрока.
+      return onValue(ref(db, '.info/connected'), (snap) => callback(snap.val() === true));
+    },
+
+    createRoom(roomName, playerName) {
+      return guard('Создание комнаты', async () => {
+        const roomId = randomId('room');
+        const name = clampName(roomName, 'Комната');
+        // Один атомарный multi-path: комната появляется сразу с host-игроком и
+        // записью в индексе — либо целиком, либо никак (нет «невидимых» комнат).
+        await update(ref(db), {
+          [`rooms/${roomId}/meta`]: {
+            roomId,
+            name,
+            hostId: uid,
+            status: 'lobby',
+            arenaSeed: 0,
+            maxPlayers: MAX_PLAYERS,
+            createdAt: serverTimestamp(),
+            countdownEndsAt: null,
+            winnerId: null,
+          },
+          [`rooms/${roomId}/players/${uid}`]: {
+            name: clampName(playerName, 'Пилот'),
+            colorIndex: 0,
+            ready: false,
+            joinedAt: serverTimestamp(),
+            presence: true,
+          },
+          [`roomsIndex/${roomId}`]: {
+            name,
+            status: 'lobby',
+            playerCount: 1,
+            maxPlayers: MAX_PLAYERS,
+            hostId: uid,
+            updatedAt: serverTimestamp(),
+          },
+        });
+        await armPresence(roomId);
+        return roomId;
+      });
+    },
+
+    joinRoom(roomId, playerName) {
+      return guard('Вход в комнату', async () => {
+        const room = await readRoom(roomId);
+        if (!room) throw new Error('Комната не найдена');
+        if (room.meta.status !== 'lobby') throw new Error('Бой уже идёт или завершён');
+        if (Object.keys(room.players).length >= MAX_PLAYERS) throw new Error('Комната заполнена');
+        const colorIndex = nextColorIndex(room.players);
+        await armPresence(roomId);
+        await set(playerRef(roomId), {
           name: clampName(playerName, 'Пилот'),
-          colorIndex: 0,
+          colorIndex,
           ready: false,
           joinedAt: serverTimestamp(),
           presence: true,
-        },
-        [`roomsIndex/${roomId}`]: {
-          name,
-          status: 'lobby',
-          playerCount: 1,
-          maxPlayers: MAX_PLAYERS,
-          hostId: uid,
-          updatedAt: serverTimestamp(),
-        },
+        });
+        await reconcileIndex(roomId);
       });
-      await armPresence(roomId);
-      return roomId;
     },
 
-    async joinRoom(roomId, playerName) {
-      const room = await readRoom(roomId);
-      if (!room) throw new Error('Комната не найдена');
-      if (room.meta.status !== 'lobby') throw new Error('Бой уже идёт или завершён');
-      if (Object.keys(room.players).length >= MAX_PLAYERS) throw new Error('Комната заполнена');
-      const colorIndex = nextColorIndex(room.players);
-      await armPresence(roomId);
-      await set(playerRef(roomId), {
-        name: clampName(playerName, 'Пилот'),
-        colorIndex,
-        ready: false,
-        joinedAt: serverTimestamp(),
-        presence: true,
-      });
-      await reconcileIndex(roomId);
+    setReady(roomId, ready) {
+      return guard('Смена готовности', () => update(playerRef(roomId), { ready }));
     },
 
-    async setReady(roomId, ready) {
-      await update(playerRef(roomId), { ready });
-    },
-
-    async startMatch(roomId) {
-      const room = await readRoom(roomId);
-      if (!room || room.meta.hostId !== uid) return;
-      // Статусы meta и индекса меняются атомарно — иначе обрыв между записями
-      // оставлял комнату «lobby» в списке при уже идущем бое.
-      await update(ref(db), {
-        [`rooms/${roomId}/meta/status`]: 'active',
-        [`rooms/${roomId}/meta/arenaSeed`]: Math.floor(Math.random() * 0xffffffff) >>> 0,
-        [`rooms/${roomId}/meta/corners`]: assignStartCorners(room.players),
-        [`rooms/${roomId}/meta/countdownEndsAt`]: Date.now() + COUNTDOWN_MS,
-        [`roomsIndex/${roomId}/status`]: 'active',
-        [`roomsIndex/${roomId}/updatedAt`]: serverTimestamp(),
+    startMatch(roomId) {
+      return guard('Старт боя', async () => {
+        const room = await readRoom(roomId);
+        if (!room || room.meta.hostId !== uid) return;
+        // Статусы meta и индекса меняются атомарно — иначе обрыв между записями
+        // оставлял комнату «lobby» в списке при уже идущем бое.
+        await update(ref(db), {
+          [`rooms/${roomId}/meta/status`]: 'active',
+          [`rooms/${roomId}/meta/arenaSeed`]: Math.floor(Math.random() * 0xffffffff) >>> 0,
+          [`rooms/${roomId}/meta/corners`]: assignStartCorners(room.players),
+          [`rooms/${roomId}/meta/countdownEndsAt`]: Date.now() + COUNTDOWN_MS,
+          [`roomsIndex/${roomId}/status`]: 'active',
+          [`roomsIndex/${roomId}/updatedAt`]: serverTimestamp(),
+        });
       });
     },
 
@@ -206,54 +227,62 @@ export async function createFirebasePort(): Promise<NetworkPort> {
       void set(stateRef(roomId), state);
     },
 
-    async finishMatch(roomId, winnerId) {
-      await runTransaction(metaRef(roomId), (current: Record<string, unknown> | null) => {
-        if (!current || current.status !== 'active') return current;
-        return {
-          ...current,
-          status: 'finished',
-          winnerId: winnerId ?? null,
-          countdownEndsAt: null,
-        };
-      });
-      await update(indexRef(roomId), { status: 'finished', updatedAt: serverTimestamp() });
-    },
-
-    async rematch(roomId) {
-      const room = await readRoom(roomId);
-      if (!room || room.meta.hostId !== uid) return;
-      await update(ref(db), {
-        [`rooms/${roomId}/meta/status`]: 'lobby',
-        [`rooms/${roomId}/meta/winnerId`]: null,
-        [`rooms/${roomId}/meta/arenaSeed`]: 0,
-        [`rooms/${roomId}/meta/corners`]: null,
-        [`rooms/${roomId}/meta/countdownEndsAt`]: null,
-        [`roomsIndex/${roomId}/status`]: 'lobby',
-        [`roomsIndex/${roomId}/updatedAt`]: serverTimestamp(),
+    finishMatch(roomId, winnerId) {
+      return guard('Завершение боя', async () => {
+        await runTransaction(metaRef(roomId), (current: Record<string, unknown> | null) => {
+          if (!current || current.status !== 'active') return current;
+          return {
+            ...current,
+            status: 'finished',
+            winnerId: winnerId ?? null,
+            countdownEndsAt: null,
+          };
+        });
+        await update(indexRef(roomId), { status: 'finished', updatedAt: serverTimestamp() });
       });
     },
 
-    async leaveRoom(roomId) {
-      const room = await readRoom(roomId);
-      if (room && room.meta.hostId === uid) {
-        const successor = playersByJoinOrder(room.players).find((p) => p.uid !== uid);
-        if (successor) await update(metaRef(roomId), { hostId: successor.uid });
-      }
-      await onDisconnect(playerRef(roomId)).cancel();
-      await onDisconnect(stateRef(roomId)).cancel();
-      // Свой player+state удаляются одним атомарным multi-path update.
-      await update(ref(db), {
-        [`rooms/${roomId}/players/${uid}`]: null,
-        [`rooms/${roomId}/states/${uid}`]: null,
+    rematch(roomId) {
+      return guard('Реванш', async () => {
+        const room = await readRoom(roomId);
+        if (!room || room.meta.hostId !== uid) return;
+        await update(ref(db), {
+          [`rooms/${roomId}/meta/status`]: 'lobby',
+          [`rooms/${roomId}/meta/winnerId`]: null,
+          [`rooms/${roomId}/meta/arenaSeed`]: 0,
+          [`rooms/${roomId}/meta/corners`]: null,
+          [`rooms/${roomId}/meta/countdownEndsAt`]: null,
+          [`roomsIndex/${roomId}/status`]: 'lobby',
+          [`roomsIndex/${roomId}/updatedAt`]: serverTimestamp(),
+        });
       });
-      await reconcileIndex(roomId);
     },
 
-    async ensureHost(roomId) {
-      const room = await readRoom(roomId);
-      if (!room || room.players[room.meta.hostId]) return;
-      const survivors = playersByJoinOrder(room.players);
-      if (survivors[0]?.uid === uid) await update(metaRef(roomId), { hostId: uid });
+    leaveRoom(roomId) {
+      return guard('Выход из комнаты', async () => {
+        const room = await readRoom(roomId);
+        if (room && room.meta.hostId === uid) {
+          const successor = playersByJoinOrder(room.players).find((p) => p.uid !== uid);
+          if (successor) await update(metaRef(roomId), { hostId: successor.uid });
+        }
+        await onDisconnect(playerRef(roomId)).cancel();
+        await onDisconnect(stateRef(roomId)).cancel();
+        // Свой player+state удаляются одним атомарным multi-path update.
+        await update(ref(db), {
+          [`rooms/${roomId}/players/${uid}`]: null,
+          [`rooms/${roomId}/states/${uid}`]: null,
+        });
+        await reconcileIndex(roomId);
+      });
+    },
+
+    ensureHost(roomId) {
+      return guard('Передача роли хозяина', async () => {
+        const room = await readRoom(roomId);
+        if (!room || room.players[room.meta.hostId]) return;
+        const survivors = playersByJoinOrder(room.players);
+        if (survivors[0]?.uid === uid) await update(metaRef(roomId), { hostId: uid });
+      });
     },
 
     dispose() {

@@ -6,7 +6,8 @@ import { ColorDot, NetScreenShell } from './shared.tsx';
 
 /** Лобби комнаты: кто подключился, готовность, старт боя у хозяина. */
 export function LobbyScreen() {
-  const { room, uid, ready, setReady, startMatch, leaveRoom, ensureHost } = useNetSessionContext();
+  const { room, uid, ready, error, setReady, startMatch, leaveRoom, ensureHost } =
+    useNetSessionContext();
 
   // Хост оборвался (закрыл вкладку/сеть): onDisconnect удалил его player-узел,
   // но meta.hostId остался — без такеовера лобби неуправляемо (никто не может
@@ -55,6 +56,8 @@ export function LobbyScreen() {
       </ul>
 
       <div className="flex flex-col gap-3">
+        {/* Таймаут недоступного сервера и прочие отказы операций — не молчим. */}
+        {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
         <button
           type="button"
           className={`sim-control px-4 py-2 ${ready ? 'sim-control--active' : ''}`}
