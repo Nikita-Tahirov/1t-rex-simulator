@@ -19,7 +19,7 @@ export default defineConfig({
     headers: {
       // Cross-origin isolation for SharedArrayBuffer (Rapier SIMD WASM)
       'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
     },
   },
   preview: {

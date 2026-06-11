@@ -40,7 +40,7 @@ function checkFirebaseHosting() {
   }
   const globalHeaders = headersFor('**');
   requireHeader(globalHeaders, 'Cross-Origin-Opener-Policy', 'same-origin');
-  requireHeader(globalHeaders, 'Cross-Origin-Embedder-Policy', 'require-corp');
+  requireHeader(globalHeaders, 'Cross-Origin-Embedder-Policy', 'credentialless');
   requireHeader(globalHeaders, 'Cross-Origin-Resource-Policy', 'same-origin');
   requireHeader(globalHeaders, 'Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   requireHeader(globalHeaders, 'X-Content-Type-Options', 'nosniff');
