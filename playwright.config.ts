@@ -84,7 +84,17 @@ export default defineConfig({
     {
       name: 'firefox-smoke',
       testMatch: /cross-env\.spec\.ts/,
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          // Firefox уважает системный прокси (chromium/webkit в Playwright —
+          // нет). Системный VPN/прокси без localhost-исключений (наблюдалось:
+          // 127.0.0.1:10809, ExcludeSimpleHostnames=0) валит goto к 127.0.0.1
+          // с NS_ERROR_NET_ERROR_RESPONSE. e2e ходят только на localhost —
+          // direct всегда корректен.
+          firefoxUserPrefs: { 'network.proxy.type': 0 },
+        },
+      },
     },
     {
       name: 'webkit-smoke',

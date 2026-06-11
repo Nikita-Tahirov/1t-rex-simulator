@@ -174,6 +174,16 @@ Presence: in-memory — явный выход + `pagehide`; Firebase — `onDisc
 - Тихая деградация firebase→in-memory больше не молчит: `port.kind` попадает в
   стор (`adapterKind`), `RoomListScreen` показывает предупреждение («комнаты
   видны только в этом браузере»), причина сбоя логируется в консоль.
+- Транспортный фолбэк WSS → long-polling (2026-06-12): в сетях, где WebSocket
+  к `*.firebasedatabase.app` режется (DPI/корп-прокси/VPN/блокировщик — у таких
+  клиентов Anonymous Auth проходит, а сокет «чёрная дыра»), SDK сам на
+  long-polling НЕ переходит (проверено: 75 с без `connected`). Поэтому
+  `firebaseClient` ждёт `connected=true` 7 с и при неудаче пересобирает стек с
+  `forceLongPolling()` (обычный HTTPS). Для этого COEP смягчён до
+  `credentialless`: long-polling RTDB — script-теги без CORP-заголовков,
+  `require-corp` блокировал их (`ERR_BLOCKED_BY_RESPONSE...ByCoep`); Rapier
+  isolation не требует (нет SharedArrayBuffer). uid при пересборке стабилен:
+  `authStateReady()` + восстановление анонимного юзера из persistence.
 - Недоступный RTDB-сокет больше не «вечное зависание» (2026-06-11): при
   блокировке `*.firebasedatabase.app` (блокировщик/файрвол/VPN) Anonymous Auth
   проходит (другой хост), деградации нет, а записи Firebase ставит в локальную
