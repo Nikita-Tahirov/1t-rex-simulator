@@ -265,13 +265,18 @@ export async function createFirebasePort(): Promise<NetworkPort> {
           const successor = playersByJoinOrder(room.players).find((p) => p.uid !== uid);
           if (successor) await update(metaRef(roomId), { hostId: successor.uid });
         }
-        await onDisconnect(playerRef(roomId)).cancel();
-        await onDisconnect(stateRef(roomId)).cancel();
-        // Свой player+state удаляются одним атомарным multi-path update.
+        // Свой player+state удаляются одним атомарным multi-path update —
+        // СТРОГО ДО cancel: обрыв после cancel, но до удаления оставлял
+        // вечного stale-игрока (sweep не чистит комнаты с непустыми players —
+        // наблюдалось на проде 2026-06-11). Обрыв до удаления безопасен:
+        // armPresence ещё армирован и сервер удалит узлы сам; обрыв после —
+        // onDisconnect сработает по уже отсутствующим узлам (no-op).
         await update(ref(db), {
           [`rooms/${roomId}/players/${uid}`]: null,
           [`rooms/${roomId}/states/${uid}`]: null,
         });
+        await onDisconnect(playerRef(roomId)).cancel();
+        await onDisconnect(stateRef(roomId)).cancel();
         await reconcileIndex(roomId);
       });
     },
