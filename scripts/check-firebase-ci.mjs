@@ -54,7 +54,7 @@ function checkFirebaseHosting() {
   ]);
   requireHeaderIncludes(globalHeaders, 'Content-Security-Policy', [
     "default-src 'self'",
-    "script-src 'self' 'wasm-unsafe-eval'",
+    "script-src 'self' 'wasm-unsafe-eval' https://*.firebasedatabase.app https://*.firebaseio.com",
     "object-src 'none'",
     "frame-ancestors 'none'",
     'upgrade-insecure-requests',
