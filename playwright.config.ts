@@ -2,20 +2,29 @@ import { defineConfig, devices } from '@playwright/test';
 
 const e2ePort = Number(process.env.SIM_E2E_PORT ?? 5174);
 const e2eBaseURL = `http://127.0.0.1:${e2ePort}`;
-// Windows локально имеет аппаратный D3D11; ubuntu/macOS на CI работают без GPU,
-// поэтому Chromium принудительно идёт на SwiftShader (Mesa software OpenGL).
-// Без `--use-gl=swiftshader` headless Chromium на ubuntu-latest не создаёт
-// WebGL context, Three.js не монтирует сцену, и все e2e падают на ожидании
+// Windows локально имеет аппаратный D3D11, macOS локально — аппаратный Metal
+// через ANGLE; ubuntu/CI работают без GPU, поэтому там Chromium принудительно
+// идёт на SwiftShader (Mesa software OpenGL). Без `--use-gl=swiftshader`
+// headless Chromium на ubuntu-latest не создаёт WebGL context, Three.js не
+// монтирует сцену, и все e2e падают на ожидании
 // `window.__sceneRenderState?.meshCount > 20` (проверено 2026-05-22).
+// На локальном Apple Silicon SwiftShader, наоборот, вреден: софтверный рендер
+// physics-heavy сцены даёт 0 КАДР/С и таймауты collision/experiments e2e
+// (проверено 2026-06-11 на M4).
 const chromiumGpuArgs =
   process.platform === 'win32'
     ? ['--use-angle=d3d11', '--ignore-gpu-blocklist']
-    : ['--use-gl=swiftshader', '--ignore-gpu-blocklist'];
+    : process.platform === 'darwin' && !process.env.CI
+      ? ['--use-angle=metal', '--ignore-gpu-blocklist']
+      : ['--use-gl=swiftshader', '--ignore-gpu-blocklist'];
 
-// Параллелизм: 4 worker по умолчанию (≈ четверть от 16-ядерной машины),
-// override через SIM_E2E_WORKERS. На CI достаточно 2, чтобы не выйти за лимит
-// доступных GPU-контекстов под D3D11.
-const defaultWorkers = process.env.CI ? 2 : 4;
+// Параллелизм: 4 worker по умолчанию на референсной 16-поточной машине
+// (i7-11800H), override через SIM_E2E_WORKERS. На CI достаточно 2, чтобы не
+// выйти за лимит доступных GPU-контекстов под D3D11. На локальном Apple
+// Silicon (M4, 10 ядер) 4 параллельных Chromium с физикой+WebGL перегружают
+// машину (таймауты waitForScenarioRunner); 2 — sweet spot (2026-06-11:
+// workers=4 → 2 failed/5 flaky, workers=2 → полностью зелёный, 6.0m).
+const defaultWorkers = process.env.CI || process.platform === 'darwin' ? 2 : 4;
 const e2eWorkers = Number(process.env.SIM_E2E_WORKERS ?? defaultWorkers);
 
 export default defineConfig({

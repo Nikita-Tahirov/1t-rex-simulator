@@ -31,6 +31,8 @@
     "firebase:check": "node scripts/check-firebase-ci.mjs",
     "hosting:smoke": "node scripts/check-hosting-render.mjs",
     "budgets:check": "node scripts/check-performance-budget.mjs",
+    "net:sweep": "node scripts/net-sweep.mjs",
+    "clean": "node scripts/clean.mjs",
     "format": "biome format --write .",
     "check": "biome check --write . && tsc -b --noEmit",
     "ci": "npm run verify",

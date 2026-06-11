@@ -3,7 +3,6 @@ import {
   onDisconnect,
   onValue,
   ref,
-  remove,
   runTransaction,
   serverTimestamp,
   set,
@@ -68,6 +67,18 @@ export async function createFirebasePort(): Promise<NetworkPort> {
   };
 
   /**
+   * Удалить комнату вместе с записью в индексе ОДНИМ атомарным multi-path
+   * update: две отдельные remove() при обрыве между ними оставляли осиротевший
+   * индекс до следующей уборки. Правила пускают удаление только при пустых
+   * `players` (или участником), поэтому ожившую комнату снести нельзя.
+   */
+  const removeRoomEverywhere = (roomId: string): Promise<void> =>
+    update(ref(db), {
+      [`rooms/${roomId}`]: null,
+      [`roomsIndex/${roomId}`]: null,
+    });
+
+  /**
    * Пересчитать `playerCount` индекса из СВЕЖЕГО `players`; пустая комната
    * удаляется целиком (правила это разрешают: players пуст). Самокорректирует
    * любую гонку join/leave: побеждает последний пересчёт, а не stale-снимок.
@@ -76,8 +87,7 @@ export async function createFirebasePort(): Promise<NetworkPort> {
     const snap = await get(ref(db, `rooms/${roomId}/players`));
     const count = snap.exists() ? Object.keys(snap.val() as Record<string, unknown>).length : 0;
     if (count === 0) {
-      await remove(ref(db, `rooms/${roomId}`));
-      await remove(indexRef(roomId));
+      await removeRoomEverywhere(roomId);
       return;
     }
     await update(indexRef(roomId), { playerCount: count, updatedAt: serverTimestamp() });
@@ -89,8 +99,7 @@ export async function createFirebasePort(): Promise<NetworkPort> {
       void get(ref(db, `rooms/${roomId}/players`))
         .then(async (snap) => {
           if (snap.exists()) return;
-          await remove(ref(db, `rooms/${roomId}`));
-          await remove(indexRef(roomId));
+          await removeRoomEverywhere(roomId);
         })
         .catch(() => {
           // Гонка с другим уборщиком/живой комнатой — безопасно игнорируем.
