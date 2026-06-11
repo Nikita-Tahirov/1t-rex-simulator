@@ -182,7 +182,10 @@ Presence: in-memory — явный выход + `pagehide`; Firebase — `onDisc
   `forceLongPolling()` (обычный HTTPS). Для этого COEP смягчён до
   `credentialless`: long-polling RTDB — script-теги без CORP-заголовков,
   `require-corp` блокировал их (`ERR_BLOCKED_BY_RESPONSE...ByCoep`); Rapier
-  isolation не требует (нет SharedArrayBuffer). uid при пересборке стабилен:
+  isolation не требует (нет SharedArrayBuffer). По той же причине `script-src`
+  CSP включает `https://*.firebasedatabase.app https://*.firebaseio.com` —
+  без них long-poll `.lp`-скрипты блокировались CSP (видно только на проде:
+  dev-сервер CSP не отдаёт). uid при пересборке стабилен:
   `authStateReady()` + восстановление анонимного юзера из persistence.
 - Недоступный RTDB-сокет больше не «вечное зависание» (2026-06-11): при
   блокировке `*.firebasedatabase.app` (блокировщик/файрвол/VPN) Anonymous Auth
