@@ -37,7 +37,7 @@ jobs:
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 24.15.0
@@ -64,7 +64,7 @@ jobs:
     environment:
       name: firebase-preview
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v5
         with:
           name: dist-${{ needs.build.outputs.sha }}
@@ -89,7 +89,7 @@ jobs:
     environment:
       name: firebase-production
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v5
         with:
           name: dist-${{ needs.build.outputs.sha }}
